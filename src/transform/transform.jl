@@ -8,6 +8,13 @@ ODEs is formed by binarize the underlying expressions (i.e. each expression is
 written either as a variable or a function with arity one or two), then a variable
 is added for each factor present in the ODE, each factor is then replaced with an expression
 for constructing intervals/relaxations, then a new ODESystem is created.
+
+
+apply_transform(IntervalTransform(), odes) should create a 2*nx dimension system of differential equations with rhs equal to f(du, u, p ,t)
+from the original with rhs f(dx, x, p, t) which when solved furnishes interval bound of x(p,t).
+
+apply_transform(McCormickIntervalTransform(), odes) should create a 4*nx dimension system of differential equations with rhs equal to f(du, u, p ,t)
+from the original with rhs f(dx, x, p, t) which when solved furnishes relaxations of x(p,t)
 =#
 function apply_transform(t::T, odes::ODESystem) where T<:AbstractTransform
 
