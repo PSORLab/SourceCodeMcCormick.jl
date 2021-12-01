@@ -9,7 +9,7 @@ written either as a variable or a function with arity one or two), then a variab
 is added for each factor present in the ODE, each factor is then replaced with an expression
 for constructing intervals/relaxations, then a new ODESystem is created.
 =#
-function apply_transform(t::T, odes::ODESystem) where T<:AbstractOverload
+function apply_transform(t::T, odes::ODESystem) where T<:AbstractTransform
 
     assigments = Assignment[]
     for eqn in equations(prob.odes)

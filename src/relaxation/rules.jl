@@ -1,14 +1,14 @@
                       
-function transform_rule(::McCormickOverload, ::typeof(exp), ycv, ycc, yL, yU, xcv, xcc, xL, xU)
+function transform_rule(::McCormickTransform, ::typeof(exp), ycv, ycc, yL, yU, xcv, xcc, xL, xU)
     mcv = mid_expr(xcv, xcc, xL)
     mcc = mid_expr(ycv, ycc, yU)
     rcv = Assignment(ycv, :(exp($mcv)))
     rcc = Assignment(ycv, line_expr(mcc, xL, xU, yL, yU))
     return AssignmentPair(rcv, rcc)
 end
-function transform_rule(::McCormickIntervalOverload, ::typeof(exp), ycv, ycc, yL, yU, xcv, xcc, xL, xU)
+function transform_rule(::McCormickIntervalTransform, ::typeof(exp), ycv, ycc, yL, yU, xcv, xcc, xL, xU)
     rL, rU = transform_rule(IntervalOverload(), exp, yL, yU, xL, xU)
-    rcv, rcc = transform_rule(McCormickOverload(), exp, ycv, ycc, yL, yU, xcv, xcc, xL, xU)
+    rcv, rcc = transform_rule(McCormickTransform(), exp, ycv, ycc, yL, yU, xcv, xcc, xL, xU)
     return AssignmentQuad(rL, rU, rcv, rcc)
 end
 

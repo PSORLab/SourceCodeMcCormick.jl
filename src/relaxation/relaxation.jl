@@ -1,14 +1,14 @@
-struct McCormickOverload <: AbstractTransform end
-struct McCormickIntervalOverload <: AbstractTransform end
+struct McCormickTransform <: AbstractTransform end
+struct McCormickIntervalTransform <: AbstractTransform end
 
-function var_names(::McCormickOverload, s::String)
+function var_names(::McCormickTransform, s::String)
     scv = Symbol(s*"_cv")
     scc = Symbol(s*"_cc")
     scv, scc
 end
-function var_names(::McCormickIntervalOverload, s::String)
-    sL, sU = var_names(IntervalOverload(), s)
-    scv, scc = var_names(McCormickOverload(), s)
+function var_names(::McCormickIntervalTransform, s::String)
+    sL, sU = var_names(IntervalTransform(), s)
+    scv, scc = var_names(McCormickTransform(), s)
     sL, sU, scv, scc
 end
 
