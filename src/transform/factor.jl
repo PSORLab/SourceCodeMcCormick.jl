@@ -21,19 +21,26 @@ factor!(ex::Symbol; assignments::Vector{Assignment}) = assignments
 factor!(ex::NTuple; assignments::Vector{Assignment}) = factor!(Expr(:($([i for i in ex]...))), assignments=assignments)
 factor!(ex::Tuple; assignments::Vector{Assignment}) = factor!(Expr(:($([i for i in ex]...))), assignments=assignments)
 
-# Seems to be working with all examples
 function factor!(ex::Expr; assignments = Assignment[])
     if is_factor(ex)
-        push!(assignments, Assignment(gensym(:aux), ex))
+        new = Assignment(gensym(:aux), ex)
+        index = findall(x -> x.rhs==new.rhs, assignments)
+        if isempty(index)
+            push!(assignments, new)
+        else
+            p = collect(1:length(assignments))
+            deleteat!(p, index[1])
+            push!(p, index[1])
+            assignments = assignments[p]
+        end
         return assignments
     end
     new_expr = []
     for arg in ex.args
-        size = length(assignments)
-        assignments = factor!(arg, assignments=assignments)
-        if size==length(assignments) 
+        if num_or_var(arg)
             push!(new_expr, arg)
         else
+            assignments = factor!(arg, assignments=assignments)
             push!(new_expr, assignments[end].lhs)
         end
     end
