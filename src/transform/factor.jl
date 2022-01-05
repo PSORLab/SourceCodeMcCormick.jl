@@ -52,20 +52,20 @@ end
 
 # Works with this example:
 # x + y + z/x
-# ex = Expr(:call, :+, :x, :y, (:call, :/, :z, :x))
+# ex = Expr(:call, :+, :x, :y, Expr(:call, :/, :z, :x))
 # a = factor!(ex)
 
 # Now this works too
 # x^3 + 5*y*x^2 + 3*y^2*x + 15*y^3 + 20
-# ex2 = Expr(:call, :+, (:call, :^, :x, 3), (:call, :*, 5, :y, (:call, :^, :x, 2)), (:call, :*, 3, (:call, :^, :y, 2), :x), (:call, :*, 15, (:call, :^, :y, 3)), 20)
+# ex2 = Expr(:call, :+, Expr(:call, :^, :x, 3), Expr(:call, :*, 5, :y, Expr(:call, :^, :x, 2)), Expr(:call, :*, 3, Expr(:call, :^, :y, 2), :x), Expr(:call, :*, 15, Expr(:call, :^, :y, 3)), 20)
 # b = factor!(ex2)
 
 # This example also seems to be working properly
 # (x/(y/z)) + (y/z) + (z/x)
-# ex3 = Expr(:call, :+, (:call, :/, :x, (:call, :/, :y, :z)), (:call, :/, :y, :z), (:call, :/, :z, :x))
+# ex3 = Expr(:call, :+, Expr(:call, :/, :x, Expr(:call, :/, :y, :z)), Expr(:call, :/, :y, :z), Expr(:call, :/, :z, :x))
 # c = factor!(ex3)
 
 # This is correct as well
 # (a/(b/(c/(d/(e/(f/g))))))
-# ex4 = Expr(:call, :/, :a, (:call, :/, :b, (:call, :/, :c, (:call, :/, :d, (:call, :/, :e, (:call, :/, :f, :g))))))
+# ex4 = Expr(:call, :/, :a, Expr(:call, :/, :b, Expr(:call, :/, :c, Expr(:call, :/, :d, Expr(:call, :/, :e, Expr(:call, :/, :f, :g))))))
 # d = factor!(ex4)
