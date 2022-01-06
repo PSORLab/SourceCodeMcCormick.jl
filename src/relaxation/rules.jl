@@ -7,7 +7,7 @@ function transform_rule(::McCormickTransform, ::typeof(exp), ycv, ycc, yL, yU, x
     return AssignmentPair(rcv, rcc)
 end
 function transform_rule(::McCormickIntervalTransform, ::typeof(exp), ycv, ycc, yL, yU, xcv, xcc, xL, xU)
-    rL, rU = transform_rule(IntervalOverload(), exp, yL, yU, xL, xU)
+    rL, rU = transform_rule(IntervalTransform(), exp, yL, yU, xL, xU)
     rcv, rcc = transform_rule(McCormickTransform(), exp, ycv, ycc, yL, yU, xcv, xcc, xL, xU)
     return AssignmentQuad(rL, rU, rcv, rcc)
 end
