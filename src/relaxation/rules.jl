@@ -1,7 +1,7 @@
                       
 function transform_rule(::McCormickTransform, ::typeof(exp), ycv, ycc, yL, yU, xcv, xcc, xL, xU)
     mcv = mid_expr(xcv, xcc, xL)
-    mcc = mid_expr(xcv, xcc, yU)
+    mcc = mid_expr(xcv, xcc, xU)
     rcv = Assignment(ycv, :(exp($mcv)))
     rcc = Assignment(ycv, line_expr(mcc, xL, xU, yL, yU))
     return AssignmentPair(rcv, rcc)
