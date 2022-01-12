@@ -12,4 +12,10 @@ function var_names(::IntervalTransform, s::String)
     sL, sU
 end
 
+function var_names(::IntervalTransform, s::Number)
+    sL = s
+    sU = s
+    sL, sU
+end
+
 include(joinpath(@__DIR__, "rules.jl"))
