@@ -1,6 +1,12 @@
 num_or_var(ex::Number) = true
 num_or_var(ex::Symbol) = true
-num_or_var(ex::Any) = false
+num_or_var(ex::Num) = true
+num_or_var(ex::typeof(+)) = true
+num_or_var(ex::typeof(*)) = true
+num_or_var(ex::Any) = checkop(op(ex))
+checkop(op::Symbol) = true
+checkop(op::Any) = false
+
 function num_or_var(ex::Vector)
     for i in ex
         if ~num_or_var(i)
@@ -16,12 +22,40 @@ function is_factor(ex::Expr)
     num_or_var(ex.args[2:end])
 end
 
-factor!(ex::Number; assignments::Vector{Assignment}) = assignments
-factor!(ex::Symbol; assignments::Vector{Assignment}) = assignments
+# factor!(ex::Number; assignments::Vector{Assignment}) = assignments
+# factor!(ex::Symbol; assignments::Vector{Assignment}) = assignments
 factor!(ex::NTuple; assignments::Vector{Assignment}) = factor!(Expr(:($([i for i in ex]...))), assignments=assignments)
 factor!(ex::Tuple; assignments::Vector{Assignment}) = factor!(Expr(:($([i for i in ex]...))), assignments=assignments)
 
+function factor!(ex::Number; assignments = Assignment[])
+    new = Assignment(gensym(:aux), ex)
+    index = findall(x -> x.rhs==new.rhs, assignments)
+    if isempty(index)
+        push!(assignments, new)
+    else
+        p = collect(1:length(assignments))
+        deleteat!(p, index[1])
+        push!(p, index[1])
+        assignments[:] = assignments[p]
+    end
+    return assignments
+end
+function factor!(ex::Symbol; assignments = Assignment[])
+    new = Assignment(gensym(:aux), ex)
+    index = findall(x -> x.rhs==new.rhs, assignments)
+    if isempty(index)
+        push!(assignments, new)
+    else
+        p = collect(1:length(assignments))
+        deleteat!(p, index[1])
+        push!(p, index[1])
+        assignments[:] = assignments[p]
+    end
+    return assignments
+end
+
 function factor!(ex::Expr; assignments = Assignment[])
+    binarize!(ex)
     if is_factor(ex)
         new = Assignment(gensym(:aux), ex)
         index = findall(x -> x.rhs==new.rhs, assignments)
@@ -31,7 +65,7 @@ function factor!(ex::Expr; assignments = Assignment[])
             p = collect(1:length(assignments))
             deleteat!(p, index[1])
             push!(p, index[1])
-            assignments = assignments[p]
+            assignments[:] = assignments[p]
         end
         return assignments
     end
@@ -40,12 +74,12 @@ function factor!(ex::Expr; assignments = Assignment[])
         if num_or_var(arg)
             push!(new_expr, arg)
         else
-            assignments = factor!(arg, assignments=assignments)
+            factor!(arg, assignments=assignments)
             push!(new_expr, assignments[end].lhs)
         end
     end
     pushfirst!(new_expr, :call)
-    assignments = factor!(Expr(:($([i for i in new_expr]...))), assignments=assignments)
+    factor!(Expr(:($([i for i in new_expr]...))), assignments=assignments)
     return assignments
 end
 
