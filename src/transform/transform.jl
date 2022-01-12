@@ -65,6 +65,82 @@ new_prob_p = remake(new_prob, p=pnew)
 # 3. solve ODE
 # 4. extract values
 
+or 
+              @parameters t σ ρ β
+@variables x(t) y(t) z(t)
+D = Differential(t)
+
+eqs = [D(D(x)) ~ σ*(y-x),
+       D(y) ~ x*(ρ-z)-y,
+       D(z) ~ x*y - β*z]
+
+@named sys = ODESystem(eqs)
+
+@show sys.iv
+@show sys.states
+@show sys.eqs
+@show sys.ps
+
+# input
+function rhs(dx,x,t,p)
+    dx[1] = p[1]*x[1]^2 + p[1]
+end
+
+# 
+function rhs(dx,x,t,p)
+    v1 = x[1]^2
+    v2 = p[1]*v1
+    v3 = v2 + p[1]
+    dx[1] = p[1]*x[1]^2 + p[1]
+end
+
+function rhs(dx,x,t,p)
+
+    p1_lo = p[1]       # p[1] lo unpack parameter
+    p1_hi = p[2]       # p[1] hi
+    x1_lo = x[1]       # unpack state
+    x1_hi = x[2]
+
+    sqr_x1_I = Interval(x1_lo,x1_hi)^2                          # rule for v[1] = x[1]^2
+    v1_lo = sqr_x1_I.lo
+    v1_hi = sqr_x1_I.hi
+
+    mul_x1p1_I = Interval(v1_lo,v1_hi)*Interval(p1_lo,p1_hi)    # rule for v[2] = p[1]*v[1]
+    v2_lo = mul_x1p1_I.lo
+    v2_hi = mul_x1p1_I.hi
+
+    plus_v2p1_I = Interval(v2_lo,v2_hi) - Interval(p1_lo,p1_hi) # rule for v[3] = p[1]*v[1]
+    v3_lo = plus_v2p1_I.lo
+    v3_hi = plus_v2p1_I.hi
+
+    dx[1] = v3_lo      # dx[1] lo
+    dx[2] = v3_hi      # dx[1] hi
+
+    nothing
+end
+
+
+function rhs(dx,x,t,p)
+
+    p1_lo = p[1]       # p[1] lo unpack parameter
+    p1_hi = p[2]       # p[1] hi
+    x1_lo = x[1]       # unpack state
+    x1_hi = x[2]
+
+    v1_lo = sqr_lo(x1_lo, x1_hi)
+    v1_hi = sqr_hi(x1_lo, x1_hi)
+
+    v2_lo = mul_lo(v1_lo, v1_hi, p1_lo, p1_hi)
+    v2_hi = mul_hi(v1_lo, v1_hi, p1_lo, p1_hi)
+
+    v3_lo = # SO ON...
+    v3_hi = 
+
+    dx[1] = v3_lo      # dx[1] lo
+    dx[2] = v3_hi      # dx[1] hi
+    
+    nothing
+end
         
 ```
         
