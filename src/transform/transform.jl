@@ -10,11 +10,13 @@ is added for each factor present in the ODE, each factor is then replaced with a
 for constructing intervals/relaxations, then a new ODESystem is created.
 
 
-apply_transform(IntervalTransform(), odes) should create a 2*nx dimension system of differential equations with rhs equal to f(du, u, p ,t)
-from the original with rhs f(dx, x, p, t) which when solved furnishes interval bound of x(p,t) from an exist system of ODEs.
+apply_transform(IntervalTransform(), odes) should create a 2*nx dimension system of differential
+equations with rhs's equal to f(du, u, p ,t) from the original with rhs's f(dx, x, p, t) which 
+when solved furnishes interval bounds of x(p,t) from an existing system of ODEs.
 
-apply_transform(McCormickIntervalTransform(), odes) should create a 4*nx dimension system of differential equations with rhs equal to f(du, u, p ,t)
-from the original with rhs f(dx, x, p, t) which when solved furnishes relaxations of x(p,t)
+apply_transform(McCormickIntervalTransform(), odes) should create a 4*nx dimension system of 
+differential equations with rhs's equal to f(du, u, p ,t) from the original with rhs's 
+f(dx, x, p, t) which when solved furnishes relaxations of x(p,t)
 
 ```
 # Sample ODESystem from Modeling Toolkit
@@ -67,28 +69,50 @@ new_prob_p = remake(new_prob, p=pnew)
 ```
         
 =#
-function apply_transform(t::T, sys, u0, p, args...) where T<:AbstractTransform
+function apply_transform(t::T, prob::ODESystem) where T<:AbstractTransform
 
-    assigments = Assignment[]
-    for eqn in equations(sys)
-        binarize!(eqn)
-        factor!(eqn, assigments)
+    assignments = Assignment[]
+    for eqn in prob.eqs
+        # Flesh out the original RHS
+        current = length(assignments)
+        factor!(toexpr(eqn.rhs), assignments=assignments)
+
+        # If new equations were added, stick on the original LHS to the last point 
+        # in assignments by stealing its RHS from the last item and taking its place
+        if length(assignments) > current
+            push!(assignments, Assignment(toexpr(eqn.lhs), assignments[end].rhs))
+            deleteat!(assignments, length(assignments)-1)
+        end
     end
 
+    # new_assignments = AssignmentPair[]
     new_assignments = Assignment[]
     for a in assignments
-        zn = var_names(t, zstr(a))
-        xn = var_names(t, xstr(a))
+        zn = var_names(t, zstr(a)) #LHS
+        xn = var_names(t, xstr(a)) #RHS(1)
+
+        first = zn[1]
+        second = zn[2]
+
+        # Define the zn's as variables
+        @variables $first $second
         if isone(arity(a)) 
             targs = (t, op(a), zn..., xn...)
          else
             targs = (t, op(a), zn..., xn..., var_names(t, ystr(a))...)
         end
-        add!(new_assignments, transform_rule(targs...))
+        println("targs: $targs")
+
+        # push!(new_assignments, transform_rule(targs...))
+        new = transform_rule(targs...)
+        push!(new_assignments, new.l)
+        push!(new_assignments, new.u)
     end
 
+    @named new_sys = ODESystem(new_eqs)
     # Form ODE system from new assignments
     # CSE - MTK.structural_simplify()
 
-    return new_assignments
+    # Figure out a way to give the new ODE system the proper parameters, variables, etc.
+    return the_new_ODE_System
 end
