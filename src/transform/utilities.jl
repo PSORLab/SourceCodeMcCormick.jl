@@ -38,3 +38,13 @@ function genvar(a::Symbol, b::Vector{Symbol})
     push!(ex.args, rhs)
     eval(ex)
 end
+function genparam(a::Symbol)
+    params = Symbol[]
+    ex = Expr(:block)
+    var_name, expr = Symbolics.construct_vars(:parameters, a, Real, nothing, nothing, nothing, ModelingToolkit.toparam, false)
+    push!(params, var_name)
+    push!(ex.args, expr)
+    rhs = Symbolics.build_expr(:vect, params)
+    push!(ex.args, rhs)
+    eval(ex)
+end
