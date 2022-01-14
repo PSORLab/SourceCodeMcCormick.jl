@@ -26,7 +26,7 @@ function genvar(a::Symbol, b=:t)
     push!(ex.args, expr)
     rhs = Symbolics.build_expr(:vect, vars)
     push!(ex.args, rhs)
-    eval(ex)
+    eval(ex)[1]
 end
 function genvar(a::Symbol, b::Vector{Symbol})
     vars = Symbol[]
@@ -36,7 +36,7 @@ function genvar(a::Symbol, b::Vector{Symbol})
     push!(ex.args, expr)
     rhs = Symbolics.build_expr(:vect, vars)
     push!(ex.args, rhs)
-    eval(ex)
+    eval(ex)[1]
 end
 function genparam(a::Symbol)
     params = Symbol[]
@@ -46,5 +46,5 @@ function genparam(a::Symbol)
     push!(ex.args, expr)
     rhs = Symbolics.build_expr(:vect, params)
     push!(ex.args, rhs)
-    eval(ex)
+    eval(ex)[1]
 end
