@@ -16,3 +16,25 @@ zstr(a::Assignment) = string_or_num(a.lhs)
 string_or_num(a::Expr) = string(a)
 string_or_num(a::Symbol) = string(a)
 string_or_num(a::Number) = a
+
+# Uses Symbolics functions to generate a variable as a function of the dependent variables of choice (default: t)
+function genvar(a::Symbol, b=:t)
+    vars = Symbol[]
+    ex = Expr(:block)
+    var_name, expr = Symbolics.construct_vars(:variables, a, Real, [b], nothing, nothing, identity, false)
+    push!(vars, var_name)
+    push!(ex.args, expr)
+    rhs = Symbolics.build_expr(:vect, vars)
+    push!(ex.args, rhs)
+    eval(ex)
+end
+function genvar(a::Symbol, b::Vector{Symbol})
+    vars = Symbol[]
+    ex = Expr(:block)
+    var_name, expr = Symbolics.construct_vars(:variables, a, Real, b, nothing, nothing, identity, false)
+    push!(vars, var_name)
+    push!(ex.args, expr)
+    rhs = Symbolics.build_expr(:vect, vars)
+    push!(ex.args, rhs)
+    eval(ex)
+end
