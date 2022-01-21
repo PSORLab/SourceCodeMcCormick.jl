@@ -8,16 +8,53 @@ arity(a::SymbolicUtils.Mul) = length(a.dict) + (~isone(a.coeff))
 
 op(a::Expr) = a.args[1]
 op(a::Assignment) = op(a.rhs)
-op(a::Number) = "const"
-op(a::Symbol) = "const"
+op(::Number) = "const"
+op(::Symbol) = "const"
+op(::SymbolicUtils.Add) = +
+op(::SymbolicUtils.Mul) = *
+op(::SymbolicUtils.Pow) = ^
+op(::SymbolicUtils.Div) = /
 
-xstr(a::Assignment) = string_or_num(a.rhs.args[2])
-ystr(a::Assignment) = string_or_num(a.rhs.args[3])
-zstr(a::Assignment) = string_or_num(a.lhs)
+xstr(a::Assignment) = sub_1(a.rhs)
+ystr(a::Assignment) = sub_2(a.rhs)
+zstr(a::Assignment) = a.lhs
 
-string_or_num(a::Expr) = string(a)
-string_or_num(a::Symbol) = string(a)
-string_or_num(a::Number) = a
+function sub_1(a::SymbolicUtils.Add)
+    sorted_dict = sort(collect(a.dict), by=x->string(x[1]))
+    return sorted_dict[1].first
+end
+function sub_2(a::SymbolicUtils.Add)
+    ~(iszero(a.coeff)) && return a.coeff
+    sorted_dict = sort(collect(a.dict), by=x->string(x[1]))
+    return sorted_dict[2].first
+end
+
+function sub_1(a::SymbolicUtils.Mul)
+    sorted_dict = sort(collect(a.dict), by=x->string(x[1]))
+    return sorted_dict[1].first
+end
+function sub_2(a::SymbolicUtils.Mul)
+    ~(isone(a.coeff)) && return a.coeff
+    sorted_dict = sort(collect(a.dict), by=x->string(x[1]))
+    return sorted_dict[2].first
+end
+
+# xstr(a::Assignment) = string_or_num(a.rhs.args[2])
+# ystr(a::Assignment) = string_or_num(a.rhs.args[3])
+# zstr(a::Assignment) = string_or_num(a.lhs)
+
+# string_or_num(a::Num) = a
+# string_or_num(a::Expr) = string(a)
+# string_or_num(a::Symbol) = string(a)
+# string_or_num(a::Number) = a
+
+# # A function to identify whether a term... is.... variable or parameter, hm
+# function identify(x::Num)
+
+# end
+
+
+
 
 # Uses Symbolics functions to generate a variable as a function of the dependent variables of choice (default: t)
 function genvar(a::Symbol, b=:t)

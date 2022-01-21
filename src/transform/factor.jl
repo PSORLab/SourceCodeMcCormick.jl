@@ -26,7 +26,7 @@ function isfactor(ex::SymbolicUtils.Add)
     (iszero(ex.coeff)) && (length(ex.dict)>2) && return false
     for (key, val) in ex.dict
         ~(isone(val)) && return false
-        ~(typeof(key)<:Term) && return false
+        ~(typeof(key)<:Term) && ~(typeof(key)<:Sym) && return false
     end
     return true
 end
@@ -35,18 +35,18 @@ function isfactor(ex::SymbolicUtils.Mul)
     (isone(ex.coeff)) && (length(ex.dict)>2) && return false
     for (key, val) in ex.dict
         ~(isone(val)) && return false
-        ~(typeof(key)<:Term) && return false
+        ~(typeof(key)<:Term) && ~(typeof(key)<:Sym) && return false
     end
     return true
 end
 function isfactor(ex::SymbolicUtils.Div)
-    ~(typeof(ex.num)<:Term) && ~(typeof(ex.num)<:Real) && return false
-    ~(typeof(ex.den)<:Term) && ~(typeof(ex.num)<:Real) && return false
+    ~(typeof(ex.num)<:Term) && ~(typeof(key)<:Sym) && ~(typeof(ex.num)<:Real) && return false
+    ~(typeof(ex.den)<:Term) && ~(typeof(key)<:Sym) && ~(typeof(ex.num)<:Real) && return false
     return true
 end
 function isfactor(ex::SymbolicUtils.Pow)
-    ~(typeof(ex.base)<:Term) && ~(typeof(ex.base)<:Real) && return false
-    ~(typeof(ex.exp)<:Term) && ~(typeof(ex.exp)<:Real) && return false
+    ~(typeof(ex.base)<:Term) && ~(typeof(key)<:Sym) && ~(typeof(ex.base)<:Real) && return false
+    ~(typeof(ex.exp)<:Term) && ~(typeof(key)<:Sym) && ~(typeof(ex.exp)<:Real) && return false
     return true
 end
 
@@ -186,9 +186,9 @@ function factor!(ex::SymbolicUtils.Mul; assignments = Assignment[])
 
     new_terms = Dict{Any, Number}()
     for (key, val) in ex.dict
-        if (typeof(key)<:Term) && isone(val)
+        if ((typeof(key)<:Term) && isone(val)) || ((typeof(key)<:Sym) && isone(val))
             new_terms[key] = val
-        elseif (typeof(key)<:Term)
+        elseif (typeof(key)<:Term) || (typeof(key)<:Sym)
             index = findall(x -> isequal(x.rhs,key^val), assignments)
             if isempty(index)
                 newsym = gensym(:aux)

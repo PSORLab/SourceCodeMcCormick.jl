@@ -145,39 +145,35 @@ end
 ```
         
 =#
-function apply_transform(t::T, prob::ODESystem) where T<:AbstractTransform
+function apply_transform(transform::T, prob::ODESystem) where T<:AbstractTransform
 
+    # Factor out the equations
     assignments = Assignment[]
     for eqn in prob.eqs
         # Flesh out the original RHS
         current = length(assignments)
-        factor!(toexpr(eqn.rhs), assignments=assignments)
+        factor!(eqn.rhs, assignments=assignments)
 
         # If new equations were added, stick on the original LHS to the last point 
         # in assignments by stealing its RHS from the last item and taking its place
         if length(assignments) > current
-            push!(assignments, Assignment(toexpr(eqn.lhs), assignments[end].rhs))
+            push!(assignments, Assignment(eqn.lhs, assignments[end].rhs))
             deleteat!(assignments, length(assignments)-1)
         end
     end
 
-    # new_assignments = AssignmentPair[]
+    # Develop equations for the transforms
     new_assignments = Assignment[]
     for a in assignments
-        zn = var_names(t, zstr(a)) #LHS
-        xn = var_names(t, xstr(a)) #RHS(1)
+        # Get zn, first. Which is the LHS.
+        zn = var_names(transform, zstr(a))
+        xn = var_names(transform, xstr(a))
 
-        first = zn[1]
-        second = zn[2]
-
-        # Define the zn's as variables
-        @variables $first $second
         if isone(arity(a)) 
-            targs = (t, op(a), zn..., xn...)
+            targs = (transform, op(a), zn..., xn...)
          else
-            targs = (t, op(a), zn..., xn..., var_names(t, ystr(a))...)
+            targs = (transform, op(a), zn..., xn..., var_names(transform, ystr(a))...)
         end
-        println("targs: $targs")
 
         # push!(new_assignments, transform_rule(targs...))
         new = transform_rule(targs...)
@@ -185,10 +181,25 @@ function apply_transform(t::T, prob::ODESystem) where T<:AbstractTransform
         push!(new_assignments, new.u)
     end
 
+    # Combine all transforms into a new set of equations and create a new ODE system
+    new_eqs = Equation[]
+    for i in new_assignments
+        push!(new_eqs, Equation(i.lhs, i.rhs))
+    end
+
     @named new_sys = ODESystem(new_eqs)
+    println("Completed.")
+
+    println(new_sys)
+    println(typeof(new_sys))
+    println(new_sys.eqs)
+
     # Form ODE system from new assignments
     # CSE - MTK.structural_simplify()
 
     # Figure out a way to give the new ODE system the proper parameters, variables, etc.
-    return the_new_ODE_System
+
+    # println(new_assignments)
+
+    return new_sys
 end
