@@ -3,6 +3,8 @@ first(a::Expr) = a.args
 arity(a::Expr) = length(a.args) - 1
 arity(a::Assignment) = arity(a.rhs)
 arity(a::Number) = 1
+arity(a::SymbolicUtils.Add) = length(a.dict) + (~iszero(a.coeff))
+arity(a::SymbolicUtils.Mul) = length(a.dict) + (~isone(a.coeff))
 
 op(a::Expr) = a.args[1]
 op(a::Assignment) = op(a.rhs)
