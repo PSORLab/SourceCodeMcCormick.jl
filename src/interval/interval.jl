@@ -70,8 +70,22 @@ end
 # end
 
 # Helper functions for navigating SymbolicUtils structures
+get_name(x::Sym{SymbolicUtils.FnType{Tuple{Any}, Real}, Nothing}) = x.name
+
+"""
+Takes x[1,1] returns :x_1_1
+"""
+function get_name(z::Term{SymbolicUtils.FnType{Tuple, Real}, Nothing})
+    d = value(z).val.f.arguments
+    x = string(d[1]) 
+    for i in 2:length(d)
+        x = x*"_"*string(i)
+    end
+    Symbol(x)
+end
+
 function get_name(s::Term)
-    return s.f.name
+    return get_name(s.f)
 end
 function get_name(s::Sym)
     return s.name
