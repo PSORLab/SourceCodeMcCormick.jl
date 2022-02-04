@@ -1,32 +1,16 @@
-num_or_var(ex::Number) = true
-num_or_var(ex::Symbol) = true
-num_or_var(ex::Num) = true
-num_or_var(ex::typeof(+)) = true
-num_or_var(ex::typeof(*)) = true
-num_or_var(ex::Any) = checkop(op(ex))
-checkop(op::Symbol) = true
-checkop(op::Any) = false
 
-function num_or_var(ex::Vector)
-    for i in ex
-        if ~num_or_var(i)
-            return false
-        end
-    end
-    return true
-end
+base_term(a::Any) = false
+base_term(a::Term{Real, Base.ImmutableDict{DataType,Any}}) = true
+base_term(a::Sym) = true
+base_term(a::Real) = true
 
-function is_factor(ex::Expr)
-    (ex.head !== :ref)
-    (ex.head !== :call) && error("Only call expressions in rhs are currently supported.")
-    num_or_var(ex.args[2:end])
-end
+
 function isfactor(ex::SymbolicUtils.Add)
     (~iszero(ex.coeff)) && (length(ex.dict)>1) && return false
     (iszero(ex.coeff)) && (length(ex.dict)>2) && return false
     for (key, val) in ex.dict
         ~(isone(val)) && return false
-        ~(typeof(key)<:Term) && ~(typeof(key)<:Sym) && return false
+        ~(base_term(key)) && return false
     end
     return true
 end
@@ -35,92 +19,27 @@ function isfactor(ex::SymbolicUtils.Mul)
     (isone(ex.coeff)) && (length(ex.dict)>2) && return false
     for (key, val) in ex.dict
         ~(isone(val)) && return false
-        ~(typeof(key)<:Term) && ~(typeof(key)<:Sym) && return false
+        ~(base_term(key)) && return false
     end
     return true
 end
 function isfactor(ex::SymbolicUtils.Div)
-    ~(typeof(ex.num)<:Term) && ~(typeof(key)<:Sym) && ~(typeof(ex.num)<:Real) && return false
-    ~(typeof(ex.den)<:Term) && ~(typeof(key)<:Sym) && ~(typeof(ex.num)<:Real) && return false
+    ~(base_term(ex.num)) && return false
+    ~(base_term(ex.den)) && return false
     return true
 end
 function isfactor(ex::SymbolicUtils.Pow)
-    ~(typeof(ex.base)<:Term) && ~(typeof(key)<:Sym) && ~(typeof(ex.base)<:Real) && return false
-    ~(typeof(ex.exp)<:Term) && ~(typeof(key)<:Sym) && ~(typeof(ex.exp)<:Real) && return false
+    ~(base_term(ex.base)) && return false
+    ~(base_term(ex.exp)) && return false
+    return true
+end
+function isfactor(ex::Term{Real,Nothing})
+    for i in ex.arguments
+        ~(base_term(i)) && return false
+    end
     return true
 end
 
-
-# factor!(ex::Number; assignments::Vector{Assignment}) = assignments
-# factor!(ex::Symbol; assignments::Vector{Assignment}) = assignments
-factor!(ex::NTuple; assignments::Vector{Assignment}) = factor!(Expr(:($([i for i in ex]...))), assignments=assignments)
-factor!(ex::Tuple; assignments::Vector{Assignment}) = factor!(Expr(:($([i for i in ex]...))), assignments=assignments)
-
-function factor!(ex::Number; assignments = Assignment[])
-    println("Inside this one")
-    index = findall(x -> x.rhs==ex, assignments)
-    if isempty(index)
-        newsym = gensym(:aux)
-        newsym = Symbol(string(newsym)[3:5] * string(newsym)[7:end])
-        newvar = genvar(newsym)
-        new = Assignment(newvar, ex)
-        push!(assignments, new)
-    else
-        p = collect(1:length(assignments))
-        deleteat!(p, index[1])
-        push!(p, index[1])
-        assignments[:] = assignments[p]
-    end
-    return assignments
-end
-function factor!(ex::Symbol; assignments = Assignment[])
-    index = findall(x -> x.rhs==ex, assignments)
-    if isempty(index)
-        newsym = gensym(:aux)
-        newsym = Symbol(string(newsym)[3:5] * string(newsym)[7:end])
-        newvar = genvar(newsym)
-        new = Assignment(newvar, ex)
-        push!(assignments, new)
-    else
-        p = collect(1:length(assignments))
-        deleteat!(p, index[1])
-        push!(p, index[1])
-        assignments[:] = assignments[p]
-    end
-    return assignments
-end
-
-function factor!(ex::Expr; assignments = Assignment[])
-    binarize!(ex)
-    if is_factor(ex)
-        index = findall(x -> x.rhs==ex, assignments)
-        if isempty(index)
-            newsym = gensym(:aux)
-            newsym = Symbol(string(newsym)[3:5] * string(newsym)[7:end])
-            newvar = genvar(newsym)
-            new = Assignment(newvar, ex)
-            push!(assignments, new)
-        else
-            p = collect(1:length(assignments))
-            deleteat!(p, index[1])
-            push!(p, index[1])
-            assignments[:] = assignments[p]
-        end
-        return assignments
-    end
-    new_expr = []
-    for arg in ex.args
-        if num_or_var(arg)
-            push!(new_expr, arg)
-        else
-            factor!(arg, assignments=assignments)
-            push!(new_expr, assignments[end].lhs)
-        end
-    end
-    pushfirst!(new_expr, :call)
-    factor!(Expr(:($([i for i in new_expr]...))), assignments=assignments)
-    return assignments
-end
 function factor!(ex::SymbolicUtils.Add; assignments = Assignment[])
     binarize!(ex)
     if isfactor(ex)
@@ -139,12 +58,11 @@ function factor!(ex::SymbolicUtils.Add; assignments = Assignment[])
         end
         return assignments
     end
-
     new_terms = Dict{Any, Number}()
     for (key, val) in ex.dict
-        if (typeof(key)<:Term) && isone(val)
+        if base_term(key) && isone(val)
             new_terms[key] = val
-        elseif (typeof(key)<:Term)
+        elseif (base_term(key))
             index = findall(x -> isequal(x.rhs,val*key), assignments)
             if isempty(index)
                 newsym = gensym(:aux)
@@ -157,7 +75,7 @@ function factor!(ex::SymbolicUtils.Add; assignments = Assignment[])
                 new_terms[assignments[index[1]].lhs] = 1
             end
         else
-            factor!(key, assignments=assignments)
+            factor!(val*key, assignments=assignments)
             new_terms[assignments[end].lhs] = 1
         end
     end
@@ -183,12 +101,11 @@ function factor!(ex::SymbolicUtils.Mul; assignments = Assignment[])
         end
         return assignments
     end
-
     new_terms = Dict{Any, Number}()
     for (key, val) in ex.dict
-        if ((typeof(key)<:Term) && isone(val)) || ((typeof(key)<:Sym) && isone(val))
+        if base_term(key) && isone(val)
             new_terms[key] = val
-        elseif (typeof(key)<:Term) || (typeof(key)<:Sym)
+        elseif base_term(key)
             index = findall(x -> isequal(x.rhs,key^val), assignments)
             if isempty(index)
                 newsym = gensym(:aux)
@@ -201,7 +118,7 @@ function factor!(ex::SymbolicUtils.Mul; assignments = Assignment[])
                 new_terms[assignments[index[1]].lhs] = 1
             end
         else
-            factor!(key, assignments=assignments)
+            factor!(key^val, assignments=assignments)
             new_terms[assignments[end].lhs] = 1
         end
     end
@@ -226,14 +143,13 @@ function factor!(ex::SymbolicUtils.Pow; assignments = Assignment[])
         end
         return assignments
     end
-
-    if typeof(ex.base)<:Term
+    if base_term(ex.base)
         new_base = ex.base
     else
         factor!(ex.base, assignments=assignments)
         new_base = assignments[end].lhs
     end
-    if typeof(ex.exp)<:Term
+    if base_term(ex.exp)
         new_exp = ex.exp
     else
         factor!(ex.exp, assignments=assignments)
@@ -260,14 +176,13 @@ function factor!(ex::SymbolicUtils.Div; assignments = Assignment[])
         end
         return assignments
     end
-
-    if typeof(ex.num)<:Term
+    if base_term(ex.num)
         new_num = ex.num
     else
         factor!(ex.num, assignments=assignments)
         new_num = assignments[end].lhs
     end
-    if typeof(ex.den)<:Term
+    if base_term(ex.den)
         new_den = ex.den
     else
         factor!(ex.den, assignments=assignments)
@@ -277,6 +192,51 @@ function factor!(ex::SymbolicUtils.Div; assignments = Assignment[])
     factor!(new_div, assignments=assignments)
     return assignments
 end
-
+function factor!(ex::Term{Real, Nothing}; assignments = Assignment[])
+    if isfactor(ex)
+        index = findall(x -> isequal(x.rhs,ex), assignments)
+        if isempty(index)
+            newsym = gensym(:aux)
+            newsym = Symbol(string(newsym)[3:5] * string(newsym)[7:end])
+            newvar = genvar(newsym)
+            new = Assignment(Symbolics.value(newvar), ex)
+            push!(assignments, new)
+        else
+            p = collect(1:length(assignments))
+            deleteat!(p, index[1])
+            push!(p, index[1])
+            assignments[:] = assignments[p]
+        end
+        return assignments
+    end
+    new_args = []
+    for arg in ex.arguments
+        if base_term(arg)
+            push!(new_args, arg)
+        else
+            factor!(arg, assignments=assignments)
+            push!(new_args, assignments[end].lhs)
+        end
+    end
+    new_func = Term(ex.f, new_args)
+    factor!(new_func, assignments=assignments)
+    return assignments
+end
+function factor!(ex::Term{Real, Base.ImmutableDict{DataType, Any}}; assignments = Assignment[])
+    index = findall(x -> isequal(x.rhs,ex), assignments)
+    if isempty(index)
+        newsym = gensym(:aux)
+        newsym = Symbol(string(newsym)[3:5] * string(newsym)[7:end])
+        newvar = genvar(newsym)
+        new = Assignment(Symbolics.value(newvar), ex)
+        push!(assignments, new)
+    else
+        p = collect(1:length(assignments))
+        deleteat!(p, index[1])
+        push!(p, index[1])
+        assignments[:] = assignments[p]
+    end
+    return assignments
+end
 
 

@@ -4,7 +4,7 @@ include(joinpath(@__DIR__, "factor.jl"))
 
 #=
 Using the list of equations provided in the ODESystem an auxilliary system of
-ODEs is formed by binarize the underlying expressions (i.e. each expression is 
+ODEs is formed by binarize'ing the underlying expressions (i.e., each expression is 
 written either as a variable or a function with arity one or two), then a variable
 is added for each factor present in the ODE, each factor is then replaced with an expression
 for constructing intervals/relaxations, then a new ODESystem is created.
@@ -147,38 +147,35 @@ end
 =#
 function apply_transform(transform::T, prob::ODESystem) where T<:AbstractTransform
 
-    # Factor out the equations
+    # Factorize all equations to generate assignments
     assignments = Assignment[]
     for eqn in prob.eqs
-        # Flesh out the original RHS
         current = length(assignments)
         factor!(eqn.rhs, assignments=assignments)
-
-        # If new equations were added, stick on the original LHS to the last point 
-        # in assignments by stealing its RHS from the last item and taking its place
         if length(assignments) > current
             push!(assignments, Assignment(eqn.lhs, assignments[end].rhs))
             deleteat!(assignments, length(assignments)-1)
+        else
+            index = findall(x -> isequal(x.rhs, eqn.rhs), assignments)
+            push!(assignments, Assignment(eqn.lhs, assignments[index[1]].lhs))
+
         end
     end
 
-    # Develop equations for the transforms
+    # Apply transform rules to the factored equations to make a new set of assignments
     new_assignments = Assignment[]
     for a in assignments
-        # Get zn, first. Which is the LHS.
         zn = var_names(transform, zstr(a))
         xn = var_names(transform, xstr(a))
-
         if isone(arity(a)) 
             targs = (transform, op(a), zn..., xn...)
          else
             targs = (transform, op(a), zn..., xn..., var_names(transform, ystr(a))...)
         end
-
-        # push!(new_assignments, transform_rule(targs...))
         new = transform_rule(targs...)
-        push!(new_assignments, new.l)
-        push!(new_assignments, new.u)
+        for i in new
+            push!(new_assignments, i)
+        end
     end
 
     # Combine all transforms into a new set of equations and create a new ODE system
@@ -186,20 +183,30 @@ function apply_transform(transform::T, prob::ODESystem) where T<:AbstractTransfo
     for i in new_assignments
         push!(new_eqs, Equation(i.lhs, i.rhs))
     end
+    println("")
+    println("Old equations:")
+    for i in prob.eqs
+        println(i)
+    end
+    println("")
+    println("New equations:")
+    for i in new_eqs
+        println(i)
+    end
+    println("")
 
-    @named new_sys = ODESystem(new_eqs)
-    println("Completed.")
+    # Copy over given start points to the new variables
+    var_defaults, param_defaults = translate_initial_conditions(transform, prob, new_eqs)
 
-    println(new_sys)
-    println(typeof(new_sys))
-    println(new_sys.eqs)
+
+    @named new_sys = ODESystem(new_eqs, default_u0=var_defaults, default_p=param_defaults)
+
 
     # Form ODE system from new assignments
     # CSE - MTK.structural_simplify()
 
     # Figure out a way to give the new ODE system the proper parameters, variables, etc.
 
-    # println(new_assignments)
 
     return new_sys
 end

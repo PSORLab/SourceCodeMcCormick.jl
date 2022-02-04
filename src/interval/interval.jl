@@ -5,32 +5,22 @@ Rules for constructing interval bounding expressions
 # Structure used to indicate an overload with intervals is preferable
 struct IntervalTransform <: AbstractTransform end
 
-# Creates names for interval state variables [DEPRECATED]
-# function var_names(::IntervalTransform, s::Num)
-#     if s.val.metadata.value[1]==:variables
-#         arg_list = Symbol[]
-#         for i in s.val.arguments
-#             push!(arg_list, get_name(i))
-#         end
-#         sL = genvar(Symbol(string(s.val.f)*"_lo"), arg_list)
-#         sU = genvar(Symbol(string(s.val.f)*"_hi"), arg_list)
-#     elseif s.val.metadata.parent.value[1]==:parameters
-#         sL = genparam(Symbol(string(s.val.name)*"_lo"))
-#         sU = genparam(Symbol(string(s.val.name)*"_hi"))
-#     else
-#         error("Not a variable or a parameter, check type of s")
-#     end
-#     return sL, sU
-# end
-
 function var_names(::IntervalTransform, s::Term{Real, Base.ImmutableDict{DataType, Any}}) #The variables
     arg_list = Symbol[]
-    for i in s.arguments
-        push!(arg_list, get_name(i))
+    if haskey(s.metadata, ModelingToolkit.MTKParameterCtx)
+        sL = genparam(Symbol(string(get_name(s))*"_lo"))
+        sU = genparam(Symbol(string(get_name(s))*"_hi"))
+    else
+        for i in s.arguments
+            push!(arg_list, get_name(i))
+        end
+        sL = genvar(Symbol(string(get_name(s))*"_lo"), arg_list)
+        sU = genvar(Symbol(string(get_name(s))*"_hi"), arg_list)
     end
-    sL = genvar(Symbol(string(s.f)*"_lo"), arg_list)
-    sU = genvar(Symbol(string(s.f)*"_hi"), arg_list)
     return sL, sU
+end
+function var_names(::IntervalTransform, s::Real)
+    return s, s
 end
 function var_names(::IntervalTransform, s::Term{Real, Nothing}) #Any terms like "Differential"
     if length(s.arguments)>1
@@ -56,9 +46,31 @@ function var_names(::IntervalTransform, s::Term{Real, Nothing}) #Any terms like 
     return sL, sU
 end
 function var_names(::IntervalTransform, s::Sym) #The parameters
-    sL = genparam(Symbol(string(s.name)*"_lo"))
-    sU = genparam(Symbol(string(s.name)*"_hi"))
+    sL = genparam(Symbol(string(get_name(s))*"_lo"))
+    sU = genparam(Symbol(string(get_name(s))*"_hi"))
     return sL, sU
+end
+
+function translate_initial_conditions(::IntervalTransform, prob::ODESystem, new_eqs::Vector{Equation})
+    vars, params = extract_terms(new_eqs)
+    var_defaults = Dict{Any, Any}()
+    param_defaults = Dict{Any, Any}()
+
+    for (key, val) in prob.defaults
+        name_lo = String(get_name(key))*"_"*"lo"
+        name_hi = String(get_name(key))*"_"*"hi"
+        for i in vars
+            if in(String(i.f.name), (name_lo, name_hi))
+                var_defaults[i] = val
+            end
+        end
+        for i in params
+            if in(String(i.name), (name_lo, name_hi))
+                param_defaults[i] = val
+            end
+        end
+    end
+    return var_defaults, param_defaults
 end
 
 
@@ -75,17 +87,26 @@ get_name(x::Sym{SymbolicUtils.FnType{Tuple{Any}, Real}, Nothing}) = x.name
 """
 Takes x[1,1] returns :x_1_1
 """
-function get_name(z::Term{SymbolicUtils.FnType{Tuple, Real}, Nothing})
-    d = value(z).val.f.arguments
-    x = string(d[1]) 
+function get_name(s::Term{SymbolicUtils.FnType{Tuple, Real}, Nothing})
+    d = s.arguments
+    new_var = string(d[1])
     for i in 2:length(d)
-        x = x*"_"*string(i)
+        new_var = new_var*"_"*string(d[i])
     end
-    Symbol(x)
+    return Symbol(new_var)
 end
 
 function get_name(s::Term)
-    return get_name(s.f)
+    if haskey(s.metadata, ModelingToolkit.MTKParameterCtx)
+        d = s.arguments
+        new_param = string(d[1])
+        for i in 2:length(d)
+            new_param = new_param*"_"*string(d[i])
+        end
+        return Symbol(new_param)
+    else
+        return get_name(s.f)
+    end
 end
 function get_name(s::Sym)
     return s.name
