@@ -40,203 +40,203 @@ function isfactor(ex::Term{Real,Nothing})
     return true
 end
 
-function factor!(ex::SymbolicUtils.Add; assignments = Assignment[])
+function factor!(ex::SymbolicUtils.Add; eqs = Equation[])
     binarize!(ex)
     if isfactor(ex)
-        index = findall(x -> isequal(x.rhs,ex), assignments)
+        index = findall(x -> isequal(x.rhs,ex), eqs)
         if isempty(index)
             newsym = gensym(:aux)
             newsym = Symbol(string(newsym)[3:5] * string(newsym)[7:end])
             newvar = genvar(newsym)
-            new = Assignment(Symbolics.value(newvar), ex)
-            push!(assignments, new)
+            new = Equation(Symbolics.value(newvar), ex)
+            push!(eqs, new)
         else
-            p = collect(1:length(assignments))
+            p = collect(1:length(eqs))
             deleteat!(p, index[1])
             push!(p, index[1])
-            assignments[:] = assignments[p]
+            eqs[:] = eqs[p]
         end
-        return assignments
+        return eqs
     end
     new_terms = Dict{Any, Number}()
     for (key, val) in ex.dict
         if base_term(key) && isone(val)
             new_terms[key] = val
         elseif (base_term(key))
-            index = findall(x -> isequal(x.rhs,val*key), assignments)
+            index = findall(x -> isequal(x.rhs,val*key), eqs)
             if isempty(index)
                 newsym = gensym(:aux)
                 newsym = Symbol(string(newsym)[3:5] * string(newsym)[7:end])
                 newvar = genvar(newsym)
-                new = Assignment(Symbolics.value(newvar), val*key)
-                push!(assignments, new)
+                new = Equation(Symbolics.value(newvar), val*key)
+                push!(eqs, new)
                 new_terms[Symbolics.value(newvar)] = 1
             else
-                new_terms[assignments[index[1]].lhs] = 1
+                new_terms[eqs[index[1]].lhs] = 1
             end
         else
-            factor!(val*key, assignments=assignments)
-            new_terms[assignments[end].lhs] = 1
+            factor!(val*key, eqs=eqs)
+            new_terms[eqs[end].lhs] = 1
         end
     end
     new_add = SymbolicUtils.Add(Real, ex.coeff, new_terms)
-    factor!(new_add, assignments=assignments)
-    return assignments
+    factor!(new_add, eqs=eqs)
+    return eqs
 end
-function factor!(ex::SymbolicUtils.Mul; assignments = Assignment[])
+function factor!(ex::SymbolicUtils.Mul; eqs = Equation[])
     binarize!(ex)
     if isfactor(ex)
-        index = findall(x -> isequal(x.rhs,ex), assignments)
+        index = findall(x -> isequal(x.rhs,ex), eqs)
         if isempty(index)
             newsym = gensym(:aux)
             newsym = Symbol(string(newsym)[3:5] * string(newsym)[7:end])
             newvar = genvar(newsym)
-            new = Assignment(Symbolics.value(newvar), ex)
-            push!(assignments, new)
+            new = Equation(Symbolics.value(newvar), ex)
+            push!(eqs, new)
         else
-            p = collect(1:length(assignments))
+            p = collect(1:length(eqs))
             deleteat!(p, index[1])
             push!(p, index[1])
-            assignments[:] = assignments[p]
+            eqs[:] = eqs[p]
         end
-        return assignments
+        return eqs
     end
     new_terms = Dict{Any, Number}()
     for (key, val) in ex.dict
         if base_term(key) && isone(val)
             new_terms[key] = val
         elseif base_term(key)
-            index = findall(x -> isequal(x.rhs,key^val), assignments)
+            index = findall(x -> isequal(x.rhs,key^val), eqs)
             if isempty(index)
                 newsym = gensym(:aux)
                 newsym = Symbol(string(newsym)[3:5] * string(newsym)[7:end])
                 newvar = genvar(newsym)
-                new = Assignment(Symbolics.value(newvar), key^val)
-                push!(assignments, new)
+                new = Equation(Symbolics.value(newvar), key^val)
+                push!(eqs, new)
                 new_terms[Symbolics.value(newvar)] = 1
             else
-                new_terms[assignments[index[1]].lhs] = 1
+                new_terms[eqs[index[1]].lhs] = 1
             end
         else
-            factor!(key^val, assignments=assignments)
-            new_terms[assignments[end].lhs] = 1
+            factor!(key^val, eqs=eqs)
+            new_terms[eqs[end].lhs] = 1
         end
     end
     new_mul = SymbolicUtils.Mul(Real, ex.coeff, new_terms)
-    factor!(new_mul, assignments=assignments)
-    return assignments
+    factor!(new_mul, eqs=eqs)
+    return eqs
 end
-function factor!(ex::SymbolicUtils.Pow; assignments = Assignment[])
+function factor!(ex::SymbolicUtils.Pow; eqs = Equation[])
     if isfactor(ex)
-        index = findall(x -> isequal(x.rhs,ex), assignments)
+        index = findall(x -> isequal(x.rhs,ex), eqs)
         if isempty(index)
             newsym = gensym(:aux)
             newsym = Symbol(string(newsym)[3:5] * string(newsym)[7:end])
             newvar = genvar(newsym)
-            new = Assignment(Symbolics.value(newvar), ex)
-            push!(assignments, new)
+            new = Equation(Symbolics.value(newvar), ex)
+            push!(eqs, new)
         else
-            p = collect(1:length(assignments))
+            p = collect(1:length(eqs))
             deleteat!(p, index[1])
             push!(p, index[1])
-            assignments[:] = assignments[p]
+            eqs[:] = eqs[p]
         end
-        return assignments
+        return eqs
     end
     if base_term(ex.base)
         new_base = ex.base
     else
-        factor!(ex.base, assignments=assignments)
-        new_base = assignments[end].lhs
+        factor!(ex.base, eqs=eqs)
+        new_base = eqs[end].lhs
     end
     if base_term(ex.exp)
         new_exp = ex.exp
     else
-        factor!(ex.exp, assignments=assignments)
-        new_exp = assignments[end].lhs
+        factor!(ex.exp, eqs=eqs)
+        new_exp = eqs[end].lhs
     end
     new_pow = SymbolicUtils.Pow(new_base, new_exp)
-    factor!(new_pow, assignments=assignments)
-    return assignments
+    factor!(new_pow, eqs=eqs)
+    return eqs
 end
-function factor!(ex::SymbolicUtils.Div; assignments = Assignment[])
+function factor!(ex::SymbolicUtils.Div; eqs = Equation[])
     if isfactor(ex)
-        index = findall(x -> isequal(x.rhs,ex), assignments)
+        index = findall(x -> isequal(x.rhs,ex), eqs)
         if isempty(index)
             newsym = gensym(:aux)
             newsym = Symbol(string(newsym)[3:5] * string(newsym)[7:end])
             newvar = genvar(newsym)
-            new = Assignment(Symbolics.value(newvar), ex)
-            push!(assignments, new)
+            new = Equation(Symbolics.value(newvar), ex)
+            push!(eqs, new)
         else
-            p = collect(1:length(assignments))
+            p = collect(1:length(eqs))
             deleteat!(p, index[1])
             push!(p, index[1])
-            assignments[:] = assignments[p]
+            eqs[:] = eqs[p]
         end
-        return assignments
+        return eqs
     end
     if base_term(ex.num)
         new_num = ex.num
     else
-        factor!(ex.num, assignments=assignments)
-        new_num = assignments[end].lhs
+        factor!(ex.num, eqs=eqs)
+        new_num = eqs[end].lhs
     end
     if base_term(ex.den)
         new_den = ex.den
     else
-        factor!(ex.den, assignments=assignments)
-        new_den = assignments[end].lhs
+        factor!(ex.den, eqs=eqs)
+        new_den = eqs[end].lhs
     end
     new_div = SymbolicUtils.Div(new_num, new_den)
-    factor!(new_div, assignments=assignments)
-    return assignments
+    factor!(new_div, eqs=eqs)
+    return eqs
 end
-function factor!(ex::Term{Real, Nothing}; assignments = Assignment[])
+function factor!(ex::Term{Real, Nothing}; eqs = Equation[])
     if isfactor(ex)
-        index = findall(x -> isequal(x.rhs,ex), assignments)
+        index = findall(x -> isequal(x.rhs,ex), eqs)
         if isempty(index)
             newsym = gensym(:aux)
             newsym = Symbol(string(newsym)[3:5] * string(newsym)[7:end])
             newvar = genvar(newsym)
-            new = Assignment(Symbolics.value(newvar), ex)
-            push!(assignments, new)
+            new = Equation(Symbolics.value(newvar), ex)
+            push!(eqs, new)
         else
-            p = collect(1:length(assignments))
+            p = collect(1:length(eqs))
             deleteat!(p, index[1])
             push!(p, index[1])
-            assignments[:] = assignments[p]
+            eqs[:] = eqs[p]
         end
-        return assignments
+        return eqs
     end
     new_args = []
     for arg in ex.arguments
         if base_term(arg)
             push!(new_args, arg)
         else
-            factor!(arg, assignments=assignments)
-            push!(new_args, assignments[end].lhs)
+            factor!(arg, eqs=eqs)
+            push!(new_args, eqs[end].lhs)
         end
     end
     new_func = Term(ex.f, new_args)
-    factor!(new_func, assignments=assignments)
-    return assignments
+    factor!(new_func, eqs=eqs)
+    return eqs
 end
-function factor!(ex::Term{Real, Base.ImmutableDict{DataType, Any}}; assignments = Assignment[])
-    index = findall(x -> isequal(x.rhs,ex), assignments)
+function factor!(ex::Term{Real, Base.ImmutableDict{DataType, Any}}; eqs = Equation[])
+    index = findall(x -> isequal(x.rhs,ex), eqs)
     if isempty(index)
         newsym = gensym(:aux)
         newsym = Symbol(string(newsym)[3:5] * string(newsym)[7:end])
         newvar = genvar(newsym)
-        new = Assignment(Symbolics.value(newvar), ex)
-        push!(assignments, new)
+        new = Equation(Symbolics.value(newvar), ex)
+        push!(eqs, new)
     else
-        p = collect(1:length(assignments))
+        p = collect(1:length(eqs))
         deleteat!(p, index[1])
         push!(p, index[1])
-        assignments[:] = assignments[p]
+        eqs[:] = eqs[p]
     end
-    return assignments
+    return eqs
 end
 
 

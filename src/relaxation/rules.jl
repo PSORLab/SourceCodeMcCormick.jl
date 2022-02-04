@@ -27,8 +27,8 @@ Unitary Rules
 function transform_rule(::McCormickTransform, ::typeof(exp), yL, yU, ycv, ycc, xL, xU, xcv, xcc)
     mcv = mid_expr(xcv, xcc, xL)
     mcc = mid_expr(xcv, xcc, xU)
-    rcv = Assignment(ycv, exp(mcv))
-    rcc = Assignment(ycc, line_expr(mcc, xL, xU, yL, yU))
+    rcv = Equation(ycv, exp(mcv))
+    rcc = Equation(ycc, line_expr(mcc, xL, xU, yL, yU))
     return rcv, rcc
 end
 
@@ -36,8 +36,8 @@ end
 Binary Rules
 =#
 function transform_rule(::McCormickTransform, ::typeof(+), zL, zU, zcv, zcc, xL, xU, xcv, xcc, yL, yU, ycv, ycc)
-    rcv = Assignment(zcv, xcv + ycv)
-    rcc = Assignment(zcc, xcc + ycc)
+    rcv = Equation(zcv, xcv + ycv)
+    rcc = Equation(zcc, xcc + ycc)
     return rcv, rcc
 end
 
@@ -45,7 +45,7 @@ end
 # Rules for multiplication adapted from:
 # https://github.com/PSORLab/McCormick.jl/blob/master/src/forward_operators/multiplication.jl
 function transform_rule(::McCormickTransform, ::typeof(*), zL, zU, zcv, zcc, xL, xU, xcv, xcc, yL, yU, ycv, ycc)
-    rcv = Assignment(zcv, IfElse.ifelse(xL >= 0.0,
+    rcv = Equation(zcv, IfElse.ifelse(xL >= 0.0,
         IfElse.ifelse(yL >= 0.0, max(yU*xcv + xU*ycv - xU*yU, yL*xcv + xL*ycv - xL*yL),
             IfElse.ifelse(yU <= 0.0, -max((-yU)*xcv + xU*(-ycv) - xU*(-yU), (-yL)*xcv + xL*(-ycv) - xL*(-yL)), 
                 max(yU*xcv + xU*ycv - xU*yU, yL*xcc + xL*ycv - xL*yL))),
@@ -56,7 +56,7 @@ function transform_rule(::McCormickTransform, ::typeof(*), zL, zU, zcv, zcc, xL,
             IfElse.ifelse(yL >= 0.0, max(xU*ycv + yU*xcv - yU*xU, xL*ycc + yL*xcv - yL*xL),
                 IfElse.ifelse(yU <= 0.0, -max(xU*(-ycv) + (-yU)*xcv - (-yU)*xU, xL*(-ycc) + (-yL)*xcv - (-yL)*xL), 
                     max(yU*xcv + xU*ycv - xU*yU, yL*xcc + xL*ycc - xL*yL))))))
-    rcc = Assignment(zcc, IfElse.ifelse(xL >= 0.0,
+    rcc = Equation(zcc, IfElse.ifelse(xL >= 0.0,
         IfElse.ifelse(yL >= 0.0, min(yL*xcc + xU*ycc - xU*yL, yU*xcc + xU*ycc - xL*yU),
             IfElse.ifelse(yU <= 0.0, -min((-yL)*xcc + xU*(-ycc) - xU*(-yL), (-yU)*xcc + xU*(-ycc) - xL*(-yU)), 
                 min(yL*xcv + xU*ycc - xU*yL, yU*xcc + xL*ycc - xL*yU))),

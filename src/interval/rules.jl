@@ -9,13 +9,13 @@ using IfElse
 Unitary Rules
 =#
 function transform_rule(::IntervalTransform, nothing, yL, yU, xL, xU)
-    rl = Assignment(yL, xL)
-    ru = Assignment(yU, xU)
-    AssignmentPair(rl, ru)
+    rl = Equation(yL, xL)
+    ru = Equation(yU, xU)
+    return rl, ru
 end
 function transform_rule(::IntervalTransform, ::typeof(exp), yL, yU, xL, xU)
-    rl = Assignment(yL, exp(xL))
-    ru = Assignment(yU, exp(xU))
+    rl = Equation(yL, exp(xL))
+    ru = Equation(yU, exp(xU))
     return rl, ru
 end
 
@@ -23,17 +23,17 @@ end
 Binary Rules
 =#
 function transform_rule(::IntervalTransform, ::typeof(+), zL, zU, xL, xU, yL, yU)
-    rl = Assignment(zL, xL + yL)
-    ru = Assignment(zU, xU + yU)
+    rl = Equation(zL, xL + yL)
+    ru = Equation(zU, xU + yU)
     return rl, ru
 end
 function transform_rule(::IntervalTransform, ::typeof(-), zL, zU, xL, xU, yL, yU)
-    rl = Assignment(zL, xL - yU)
-    ru = Assignment(zU, xU - yL)
+    rl = Equation(zL, xL - yU)
+    ru = Equation(zU, xU - yL)
     return rl, ru
 end
 function transform_rule(::IntervalTransform, ::typeof(*), zL, zU, xL, xU, yL, yU)
-    rl = Assignment(zL, IfElse.ifelse(yL >= 0.0, 
+    rl = Equation(zL, IfElse.ifelse(yL >= 0.0, 
         IfElse.ifelse(xL >= 0.0, xL*yL,
             IfElse.ifelse(xU <= 0.0, xL*yU, xL*yU)),
         IfElse.ifelse(yU <= 0.0,
@@ -41,7 +41,7 @@ function transform_rule(::IntervalTransform, ::typeof(*), zL, zU, xL, xU, yL, yU
                 IfElse.ifelse(xU <= 0.0, xU*yU, xU*yL)),
             IfElse.ifelse(xL > 0.0, xU*yL,
                 IfElse.ifelse(xU < 0.0, xL*yU, min(xU*yL, xU*yU))))))
-    ru = Assignment(zU, IfElse.ifelse(yL >= 0.0, 
+    ru = Equation(zU, IfElse.ifelse(yL >= 0.0, 
         IfElse.ifelse(xL >= 0.0, xU*yU,
             IfElse.ifelse(xU <= 0.0, xU*yL, xU*yU)),
         IfElse.ifelse(yU <= 0.0,
@@ -54,13 +54,13 @@ end
 
 
 function transform_rule(::IntervalTransform, ::typeof(min), zL, zU, xL, xU, yL, yU)
-    rl = Assignment(zL, min(xL, yL))
-    ru = Assignment(zU, min(xU, yU))
+    rl = Equation(zL, min(xL, yL))
+    ru = Equation(zU, min(xU, yU))
     return rl, ru
 end
 function transform_rule(::IntervalTransform, ::typeof(max), zL, zU, xL, xU, yL, yU)
-    rl = Assignment(zL, max(xL, yL))
-    ru = Assignment(zU, max(xU, yU))
+    rl = Equation(zL, max(xL, yL))
+    ru = Equation(zU, max(xU, yU))
     return rl, ru
 end
 

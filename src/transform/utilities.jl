@@ -1,11 +1,11 @@
 
-arity(a::Assignment) = arity(a.rhs)
+arity(a::Equation) = arity(a.rhs)
 arity(a::Term{Real, Base.ImmutableDict{DataType,Any}}) = 1
 arity(a::Term{Real, Nothing}) = length(a.arguments)
 arity(a::SymbolicUtils.Add) = length(a.dict) + (~iszero(a.coeff))
 arity(a::SymbolicUtils.Mul) = length(a.dict) + (~isone(a.coeff))
 
-op(a::Assignment) = op(a.rhs)
+op(a::Equation) = op(a.rhs)
 op(::SymbolicUtils.Add) = +
 op(::SymbolicUtils.Mul) = *
 op(::SymbolicUtils.Pow) = ^
@@ -13,9 +13,9 @@ op(::SymbolicUtils.Div) = /
 op(::Term{Real, Base.ImmutableDict{DataType,Any}}) = nothing
 op(a::Term{Real, Nothing}) = a.f
 
-xstr(a::Assignment) = sub_1(a.rhs)
-ystr(a::Assignment) = sub_2(a.rhs)
-zstr(a::Assignment) = a.lhs
+xstr(a::Equation) = sub_1(a.rhs)
+ystr(a::Equation) = sub_2(a.rhs)
+zstr(a::Equation) = a.lhs
 
 sub_1(a::Term{Real, Base.ImmutableDict{DataType,Any}}) = a
 function sub_1(a::SymbolicUtils.Add)

@@ -8,17 +8,17 @@ abstract type AbstractTransform end
 # ADD documentation for generic function here
 function transform_rule end
 
-struct AssignmentPair
-    l::Assignment
-    u::Assignment
-end
+# struct AssignmentPair
+#     l::Assignment
+#     u::Assignment
+# end
 
-struct AssignmentQuad
-    l::Assignment
-    u::Assignment
-    cv::Assignment
-    cc::Assignment
-end
+# struct AssignmentQuad
+#     l::Assignment
+#     u::Assignment
+#     cv::Assignment
+#     cc::Assignment
+# end
 
 include(joinpath(@__DIR__, "interval", "interval.jl"))
 include(joinpath(@__DIR__, "relaxation", "relaxation.jl"))
