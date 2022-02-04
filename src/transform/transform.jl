@@ -147,7 +147,7 @@ end
 =#
 function apply_transform(transform::T, prob::ODESystem) where T<:AbstractTransform
 
-    # Factorize all equations to generate equations
+    # Factorize all model equations to generate a new set of equations
     equations = Equation[]
     for eqn in prob.eqs
         current = length(equations)
@@ -162,7 +162,7 @@ function apply_transform(transform::T, prob::ODESystem) where T<:AbstractTransfo
         end
     end
 
-    # Apply transform rules to the factored equations to make a new set of equations
+    # Apply transform rules to the factored equations to make the final equation set
     new_equations = Equation[]
     for a in equations
         zn = var_names(transform, zstr(a))
@@ -178,12 +178,6 @@ function apply_transform(transform::T, prob::ODESystem) where T<:AbstractTransfo
         end
     end
 
-    # Convert equations to equations (why are we doing equations in the first place, actually?)
-    # Combine all transforms into a new set of equations and create a new ODE system
-    # new_eqs = Equation[]
-    # for i in new_equations
-    #     push!(new_eqs, Equation(i.lhs, i.rhs))
-    # end
     println("")
     println("Old equations:")
     for i in prob.eqs
@@ -196,10 +190,10 @@ function apply_transform(transform::T, prob::ODESystem) where T<:AbstractTransfo
     end
     println("")
 
-    # Copy over given start points to the new variables
+    # Copy model start points to the newly transformed variables
     var_defaults, param_defaults = translate_initial_conditions(transform, prob, new_equations)
 
-
+    # Use the transformed equations and new start points to generate a new ODE system
     @named new_sys = ODESystem(new_equations, default_u0=var_defaults, default_p=param_defaults)
 
 
