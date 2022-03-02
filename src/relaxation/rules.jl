@@ -142,6 +142,17 @@ function transform_rule(::McCormickTransform, ::typeof(*), zL, zU, zcv, zcc, xL,
 
 end
 
+function transform_rule(::McCormickTransform, ::typeof(min), zL, zU, zcv, zcc, xL, xU, xcv, xcc, yL, yU, ycv, ycc)
+    rcv = Equation(zcv, min(xcv, ycv))
+    rcc = Equation(zcc, min(xcc, ycc))
+    return rcv, rcc
+end
+
+function transform_rule(::McCormickTransform, ::typeof(max), zL, zU, zcv, zcc, xL, xU, xcv, xcc, yL, yU, ycv, ycc)
+    rcv = Equation(zcv, min(xcv, ycv))
+    rcc = Equation(zcc, min(xcc, ycc))
+    return rcv, rcc
+end
 
 #=
 TODO: Add other operators. It's probably helpful to break the McCormick overload and McCormick + Interval Outputs

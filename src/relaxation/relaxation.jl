@@ -13,7 +13,7 @@ function var_names(::McCormickTransform, s::Term{Real, Base.ImmutableDict{DataTy
         scv = genvar(Symbol(string(get_name(s))*"_cv"), arg_list)
         scc = genvar(Symbol(string(get_name(s))*"_cc"), arg_list)
     end
-    return scv, scc
+    return Symbolics.value(scv), Symbolics.value(scc)
 end
 function var_names(::McCormickTransform, s::Real)
     return s, s
@@ -39,12 +39,12 @@ function var_names(::McCormickTransform, s::Term{Real, Nothing}) #Any terms like
 
     scv = s.f(var_cv)
     scc = s.f(var_cc)
-    return scv, scc
+    return Symbolics.value(scv), Symbolics.value(scc)
 end
 function var_names(::McCormickTransform, s::Sym) #The parameters
     scv = genparam(Symbol(string(get_name(s))*"_cv"))
     scc = genparam(Symbol(string(get_name(s))*"_cc"))
-    return scv, scc
+    return Symbolics.value(scv), Symbolics.value(scc)
 end
 
 function translate_initial_conditions(::McCormickTransform, prob::ODESystem, new_eqs::Vector{Equation})

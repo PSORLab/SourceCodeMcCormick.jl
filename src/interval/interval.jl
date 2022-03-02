@@ -17,7 +17,7 @@ function var_names(::IntervalTransform, s::Term{Real, Base.ImmutableDict{DataTyp
         sL = genvar(Symbol(string(get_name(s))*"_lo"), arg_list)
         sU = genvar(Symbol(string(get_name(s))*"_hi"), arg_list)
     end
-    return sL, sU
+    return Symbolics.value(sL), Symbolics.value(sU)
 end
 function var_names(::IntervalTransform, s::Real)
     return s, s
@@ -43,12 +43,12 @@ function var_names(::IntervalTransform, s::Term{Real, Nothing}) #Any terms like 
 
     sL = s.f(var_lo)
     sU = s.f(var_hi)
-    return sL, sU
+    return Symbolics.value(sL), Symbolics.value(sU)
 end
 function var_names(::IntervalTransform, s::Sym) #The parameters
     sL = genparam(Symbol(string(get_name(s))*"_lo"))
     sU = genparam(Symbol(string(get_name(s))*"_hi"))
-    return sL, sU
+    return Symbolics.value(sL), Symbolics.value(sU)
 end
 
 function translate_initial_conditions(::IntervalTransform, prob::ODESystem, new_eqs::Vector{Equation})
