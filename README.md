@@ -28,7 +28,7 @@ Differential(t)(x[1](t)) ~ x[1](t) + p[1]
 Differential(t)(x[2](t)) ~ x[2](t) + p[2]
 ```
 
-and generates a new ODE system (`new_syst') with equations:
+and generates a new ODE system (`new_syst`) with equations:
 ```
 Differential(t)(x_1_lo(t)) ~ p_1_lo + x_1_lo(t)
 Differential(t)(x_1_hi(t)) ~ p_1_hi + x_1_hi(t)
