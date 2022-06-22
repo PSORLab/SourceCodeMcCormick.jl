@@ -148,6 +148,9 @@ end
 function apply_transform(transform::T, prob::ODESystem) where T<:AbstractTransform
 
     # Factorize all model equations to generate a new set of equations
+
+    genparam(get_name(prob.iv.val))
+
     equations = Equation[]
     for eqn in prob.eqs
         current = length(equations)
@@ -178,33 +181,37 @@ function apply_transform(transform::T, prob::ODESystem) where T<:AbstractTransfo
         end
     end
 
-    println("")
-    println("Old equations:")
-    for i in prob.eqs
-        println(i)
-    end
-    println("")
-    println("New equations:")
-    for i in new_equations
-        println(i)
-    end
-    println("")
+    # println("")
+    # println("Old equations:")
+    # for i in prob.eqs
+    #     println(i)
+    # end
+    # println("")
+    # println("New equations:")
+    # for i in new_equations
+    #     println(i)
+    # end
+    # println("")
 
     # Copy model start points to the newly transformed variables
     var_defaults, param_defaults = translate_initial_conditions(transform, prob, new_equations)
+    # for i in param_defaults
+    #     print(i)
+    #     print("\n")
+    # end
+    # for i in var_defaults
+    #     print(i)
+    #     print("\n")
+    # end
+    
 
     # Use the transformed equations and new start points to generate a new ODE system
-    @named new_sys = ODESystem(new_equations, default_u0=var_defaults, default_p=param_defaults)
+    # @named new_sys = ODESystem(new_equations, default_u0=var_defaults, default_p=param_defaults)
 
-
-    # Form ODE system from new equations
-    # CSE - MTK.structural_simplify()
+    @named new_sys = ODESystem(new_equations, defaults=merge(var_defaults, param_defaults))
 
     #Extract RHS and evaluate at a point, make that a script that tests any functions.
     # RHS this function, reference the correct thing, go
-
-    # Figure out a way to give the new ODE system the proper parameters, variables, etc.
-
 
     return new_sys
 end

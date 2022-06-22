@@ -105,7 +105,7 @@ end
 line_expr(x, xL, xU, zL, zU) = IfElse.ifelse(zU > zL, (zL*(xU - x) + zU*(x - xL))/(xU - xL), zU)
 
 # A symbolic way of computing the mid of three numbers (returns IfElse block)
-mid_expr(x, y, z) = IfElse.ifelse((x < y) && (y < z), y, IfElse.ifelse((z < y) && (y < x), y,
-                    IfElse.ifelse((y < x) && (x < z), x, IfElse.ifelse((z < x) && (x < y), x, z))))
+mid_expr(a, b, c) = IfElse.ifelse((a < b) && (b < c), y, IfElse.ifelse((c < b) && (b < a), b,
+                    IfElse.ifelse((b < a) && (a < c), x, IfElse.ifelse((c < a) && (a < b), a, c))))
 
 include(joinpath(@__DIR__, "rules.jl"))

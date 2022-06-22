@@ -90,6 +90,7 @@ function extract_terms(eqs::Vector{Equation})
         ModelingToolkit.collect_vars!(allstates, ps, eq.lhs, iv)
         ModelingToolkit.collect_vars!(allstates, ps, eq.rhs, iv)
     end
+
     return allstates, ps
 end
 
@@ -137,3 +138,41 @@ function set_bounds(sys::ODESystem, terms::Vector{Num}, bounds::Vector{Tuple{Flo
     end
     return sys
 end 
+
+function get_cvcc_start_dict(sys::ODESystem, term::Num, start_point::Float64)
+    base_name = get_name(Symbolics.value(term))
+    name_cv = String(base_name)*"_"*"cv"
+    name_cc = String(base_name)*"_"*"cc"
+
+    model_terms = Vector{Union{Term,Sym}}()
+    for i in sys.states
+        push!(model_terms, Symbolics.value(i))
+    end
+    for i in sys.ps
+        push!(model_terms, Symbolics.value(i))
+    end
+    real_cv = nothing
+    real_cc = nothing
+    for i in model_terms
+        if String(get_name(i))==name_cv
+            real_cv = i
+        elseif String(get_name(i))==name_cc
+            real_cc = i
+        end
+    end
+
+    new_dict = copy(sys.defaults)
+    if real_cv in keys(new_dict)
+        delete!(new_dict, real_cv)
+        new_dict[real_cv] = start_point
+    else
+        new_dict[real_cv] = start_point
+    end
+    if real_cc in keys(new_dict)
+        delete!(new_dict, real_cc)
+        new_dict[real_cc] = start_point
+    else
+        new_dict[real_cc] = start_point
+    end
+    return new_dict
+end
