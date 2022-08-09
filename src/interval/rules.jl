@@ -1,6 +1,4 @@
 
-using IfElse
-
 # Transformation rules should have the general form listed below:
 # Check IntervalArithmetic for valid interval bound rules (we won't be able 
 # to do correctly rounded stuff on GPUs but otherwise the operators should work out)
@@ -9,6 +7,11 @@ using IfElse
 Unitary Rules
 =#
 function transform_rule(::IntervalTransform, nothing, yL, yU, xL, xU)
+    rl = Equation(yL, xL)
+    ru = Equation(yU, xU)
+    return rl, ru
+end
+function transform_rule(::IntervalTransform, ::typeof(getindex), yL, yU, xL, xU)
     rl = Equation(yL, xL)
     ru = Equation(yU, xU)
     return rl, ru
@@ -61,6 +64,13 @@ end
 function transform_rule(::IntervalTransform, ::typeof(max), zL, zU, xL, xU, yL, yU)
     rl = Equation(zL, max(xL, yL))
     ru = Equation(zU, max(xU, yU))
+    return rl, ru
+end
+function transform_rule(::IntervalTransform, ::typeof(^), zL, zU, xL, xU, yL, yU)
+    ~((typeof(yL) <: Int) || (typeof(yL) <: AbstractFloat)) && error("Symbolic exponents not currently supported.")
+    ~(yL == 2) && error("Exponents besides 2 not currently supported")
+    rl = Equation(zL, max(min(xU, 0.0), xL)^2)
+    ru = Equation(zU, IfElse.ifelse(xU < 0.0, xL, IfElse.ifelse(xL > 0, xU, IfElse.ifelse(abs(xL) >= abs(xU), xL, xU)))^2)
     return rl, ru
 end
 

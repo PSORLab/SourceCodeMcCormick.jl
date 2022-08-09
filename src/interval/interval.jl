@@ -22,11 +22,8 @@ end
 function var_names(::IntervalTransform, s::Real)
     return s, s
 end
-function var_names(::IntervalTransform, s::Term{Real, Nothing}) #Any terms like "Differential"
-    if length(s.arguments)>1
-        error("Multiple arguments not supported.")
-    end
-    if typeof(s.arguments[1])<:Term #then it has args
+function var_names(::IntervalTransform, s::Term{Real, Nothing}) #Any terms like "Differential", or "x[1]" (NOT x[1](t))
+    if typeof(s.arguments[1])<:Term #then it has typical args like "x", "y", ...
         args = Symbol[]
         for i in s.arguments[1].arguments
             push!(args, get_name(i))
@@ -34,9 +31,14 @@ function var_names(::IntervalTransform, s::Term{Real, Nothing}) #Any terms like 
         var = get_name(s.arguments[1])
         var_lo = genvar(Symbol(string(var)*"_lo"), args)
         var_hi = genvar(Symbol(string(var)*"_hi"), args)
-    elseif typeof(s.arguments[1])<:Sym #Then it has no args
-        var_lo = genparam(Symbol(string(s.arguments[1].name)*"_lo"))
-        var_hi = genparam(Symbol(string(s.arguments[1].name)*"_hi"))
+    elseif typeof(s.arguments[1])<:Sym #Then it has no typical args, i.e., x[1] has args Any[x, 1]
+        if length(s.arguments)==1
+            var_lo = genparam(Symbol(string(s.arguments[1].name)*"_lo"))
+            var_hi = genparam(Symbol(string(s.arguments[1].name)*"_hi"))
+        else
+            var_lo = genparam(Symbol(string(s.arguments[1].name)*"_"*string(s.arguments[2])*"_lo"))
+            var_hi = genparam(Symbol(string(s.arguments[1].name)*"_"*string(s.arguments[2])*"_hi"))
+        end
     else
         error("Type of argument invalid")
     end
@@ -74,18 +76,13 @@ function translate_initial_conditions(::IntervalTransform, prob::ODESystem, new_
 end
 
 
-
-# function var_names(::IntervalTransform, s::Number)
-#     sL = s
-#     sU = s
-#     sL, sU
-# end
-
 # Helper functions for navigating SymbolicUtils structures
 get_name(x::Sym{SymbolicUtils.FnType{Tuple{Any}, Real}, Nothing}) = x.name
 
 """
-Takes x[1,1] returns :x_1_1
+    get_name
+
+Take a Symbolic-type object such as `x[1,1]` and return a symbol like `:x_1_1`.
 """
 function get_name(s::Term{SymbolicUtils.FnType{Tuple, Real}, Nothing})
     d = s.arguments

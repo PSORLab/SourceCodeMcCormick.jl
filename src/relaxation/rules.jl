@@ -1,5 +1,3 @@
-    
-using IfElse
 
 # Note: McCormick transform is only the convex and concave portions of the transformation,
 # so that the interval transforms (which are the same as for a regular Interval Transform)
@@ -24,6 +22,11 @@ end
 #=
 Unitary Rules
 =#
+function transform_rule(::McCormickTransform, ::typeof(getindex), yL, yU, ycv, ycc, xL, xU, xcv, xcc)
+    rcv = Equation(ycv, xcv)
+    rcc = Equation(ycc, xcc)
+    return rcv, rcc
+end
 function transform_rule(::McCormickTransform, ::typeof(exp), yL, yU, ycv, ycc, xL, xU, xcv, xcc)
     mcv = mid_expr(xcv, xcc, xL)
     mcc = mid_expr(xcv, xcc, xU)
@@ -153,6 +156,17 @@ function transform_rule(::McCormickTransform, ::typeof(max), zL, zU, zcv, zcc, x
     rcc = Equation(zcc, min(xcc, ycc))
     return rcv, rcc
 end
+
+function transform_rule(::McCormickTransform, ::typeof(^), zL, zU, zcv, zcc, xL, xU, xcv, xcc, yL, yU, ycv, ycc)
+    ~((typeof(yL) <: Int) || (typeof(yL) <: AbstractFloat)) && error("Symbolic exponents not currently supported.")
+    ~(yL == 2) && error("Exponents besides 2 not currently supported")
+    mcv = mid_expr(xcv, xcc, max(min(xU, 0.0), xL))
+    mcc = mid_expr(xcv, xcc, IfElse.ifelse(xU < 0.0, xL, IfElse.ifelse(xL > 0, xU, IfElse.ifelse(abs(xL) >= abs(xU), xL, xU))))
+    rcv = Equation(zcv, mcv^2)
+    rcc = Equation(zcc, (xL+xU)*mcc - xU*xL)
+    return rcv, rcc
+end
+
 
 #=
 TODO: Add other operators. It's probably helpful to break the McCormick overload and McCormick + Interval Outputs

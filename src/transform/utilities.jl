@@ -1,9 +1,10 @@
 
 arity(a::Equation) = arity(a.rhs)
 arity(a::Term{Real, Base.ImmutableDict{DataType,Any}}) = 1
-arity(a::Term{Real, Nothing}) = length(a.arguments)
+arity(a::Term{Real, Nothing}) = 1
 arity(a::SymbolicUtils.Add) = length(a.dict) + (~iszero(a.coeff))
 arity(a::SymbolicUtils.Mul) = length(a.dict) + (~isone(a.coeff))
+arity(a::SymbolicUtils.Pow) = 2
 
 op(a::Equation) = op(a.rhs)
 op(::SymbolicUtils.Add) = +
@@ -37,13 +38,22 @@ function sub_2(a::SymbolicUtils.Mul)
     sorted_dict = sort(collect(a.dict), by=x->string(x[1]))
     return sorted_dict[2].first
 end
+function sub_1(a::SymbolicUtils.Pow)
+    return a.base
+end
+function sub_2(a::SymbolicUtils.Pow)
+    return a.exp
+end
 
 sub_1(a::Term{Real, Nothing}) = a.arguments[1]
 sub_2(a::Term{Real, Nothing}) = a.arguments[2]
 
 
 # Uses Symbolics functions to generate a variable as a function of the dependent variables of choice (default: t)
-function genvar(a::Symbol, b=:t)
+function genvar(a::Symbol)
+    @isdefined(t) ? genvar(a, :t) : genparam(a)
+end
+function genvar(a::Symbol, b::Symbol)
     vars = Symbol[]
     ex = Expr(:block)
     var_name, expr = Symbolics.construct_vars(:variables, a, Real, [b], nothing, nothing, identity, false)
@@ -175,4 +185,294 @@ function get_cvcc_start_dict(sys::ODESystem, term::Num, start_point::Float64)
         new_dict[real_cc] = start_point
     end
     return new_dict
+end
+
+
+# Side note: this is how you can get a and b to show up NOT as a(t) and b(t)
+# t = genparam(:t)
+# a = genvar(:a)
+# b = genvar(:b)
+# st = SymbolicUtils.Code.NameState(Dict(a => :a, b => :b))
+# toexpr(a+b, st)
+
+
+"""
+    pull_vars(eqn::Equation)
+    pull_vars(eqns::Vector{Equation})
+
+Pull out all variables/symbols from the RHS of an equation or set
+of equations and sorts them alphabetically. 
+
+# Example
+
+```julia> @variables out, x, y, z
+julia> func = out ~ z + 2*y - 3*x*z
+julia> pull_vars(func)
+3-element Vector{Num}:
+ x
+ y
+ z
+```
+"""
+function pull_vars(eqn::Equation)
+    vars = Num[]
+    strings = String[]
+    vars, strings = _pull_vars(eqn.rhs, vars, strings)
+    vars = vars[sortperm(strings)]
+    return vars
+end
+
+function pull_vars(eqns::Vector{Equation})
+    vars = Num[]
+    strings = String[]
+    for eqn in eqns
+        vars, strings = _pull_vars(eqn.rhs, vars, strings)
+    end
+    vars = vars[sortperm(strings)]
+    return vars
+end
+
+function _pull_vars(term::SymbolicUtils.Add, vars::Vector{Num}, strings::Vector{String})
+    args = arguments(term)
+    for arg in args
+        # if (typeof(arg) == Term{Real, Nothing}) || (typeof(arg) == Sym{Real, Base.ImmutableDict{DataType, Any}})
+        if (typeof(arg) <: Sym{Real, Base.ImmutableDict{DataType, Any}})
+            if ~(string(arg) in strings)
+                push!(strings, string(arg))
+                push!(vars, arg)
+            end
+        elseif (typeof(arg) <: Int) || (typeof(arg) <: AbstractFloat)
+            nothing
+        else
+            vars, strings = _pull_vars(arg, vars, strings)
+        end
+    end
+    return vars, strings
+end
+
+function _pull_vars(term::SymbolicUtils.Mul, vars::Vector{Num}, strings::Vector{String})
+    args = arguments(term)
+    for arg in args
+        # if (typeof(arg) == Term{Real, Nothing}) || (typeof(arg) == Sym{Real, Base.ImmutableDict{DataType, Any}})
+        if (typeof(arg) <: Sym{Real, Base.ImmutableDict{DataType, Any}})
+            if ~(string(arg) in strings)
+                push!(strings, string(arg))
+                push!(vars, arg)
+            end
+        elseif (typeof(arg) <: Int) || (typeof(arg) <: AbstractFloat)
+            nothing
+        else
+            vars, strings = _pull_vars(arg, vars, strings)
+        end
+    end
+    return vars, strings
+end
+
+function _pull_vars(term::SymbolicUtils.Pow, vars::Vector{Num}, strings::Vector{String})
+    args = arguments(term)
+    for arg in args
+        # if (typeof(arg) == Term{Real, Nothing}) || (typeof(arg) == Sym{Real, Base.ImmutableDict{DataType, Any}})
+        if (typeof(arg) <: Sym{Real, Base.ImmutableDict{DataType, Any}})
+            if ~(string(arg) in strings)
+                push!(strings, string(arg))
+                push!(vars, arg)
+            end
+        elseif (typeof(arg) <: Int) || (typeof(arg) <: AbstractFloat)
+            nothing
+        else
+            vars, strings = _pull_vars(arg, vars, strings)
+        end
+    end
+    return vars, strings
+end
+
+function _pull_vars(term::SymbolicUtils.Term{Real, Nothing}, vars::Vector{Num}, strings::Vector{String})
+    args = arguments(term)
+    for arg in args
+        # if (typeof(arg) == Term{Real, Nothing}) || (typeof(arg) == Sym{Real, Base.ImmutableDict{DataType, Any}})
+        if (typeof(arg) <: Sym{Real, Base.ImmutableDict{DataType, Any}})
+            if ~(string(arg) in strings)
+                push!(strings, string(arg))
+                push!(vars, arg)
+            end
+        elseif (typeof(arg) <: Int) || (typeof(arg) <: AbstractFloat)
+            nothing
+        else
+            vars, strings = _pull_vars(arg, vars, strings)
+        end
+    end
+    return vars, strings
+end
+
+function _pull_vars(term::SymbolicUtils.Term{Bool, Nothing}, vars::Vector{Num}, strings::Vector{String})
+    args = arguments(term)
+    for arg in args
+        # if (typeof(arg) == Term{Real, Nothing}) || (typeof(arg) == Sym{Real, Base.ImmutableDict{DataType, Any}})
+        if (typeof(arg) <: Sym{Real, Base.ImmutableDict{DataType, Any}})
+            if ~(string(arg) in strings)
+                push!(strings, string(arg))
+                push!(vars, arg)
+            end
+        elseif (typeof(arg) <: Int) || (typeof(arg) <: AbstractFloat)
+            nothing
+        else
+            vars, strings = _pull_vars(arg, vars, strings)
+        end
+    end
+    return vars, strings
+end
+
+"""
+    shrink_eqs(::Vector{Equation})
+    shrink_eqs(::Vector{Equation}, ::Int)
+
+Given a set of symbolic equations, progressively substitute
+the RHS definitions of LHS terms until there are only a set
+number of equations remaining (default = 4).
+
+# Example
+
+```
+eqs = [y ~ 15*x,
+       z ~ (1+y)^2]
+shrink_eqs(eqs, 1)
+
+1-element Vector{Equation}:
+ z ~ (1 + 15x)^2
+```
+"""
+function shrink_eqs(eqs::Vector{Equation}, keep::Int64=4)
+    new_eqs = eqs
+    for i in 1:length(eqs)-keep
+        new_eqs = substitute(new_eqs, Dict(new_eqs[i].lhs => new_eqs[i].rhs))
+    end
+    new_eqs = new_eqs[end-(keep-1):end]
+    return new_eqs
+end
+
+"""
+    convex_evaluator(::Equation)
+    convex_evaluator(::Num)
+
+Given a symbolic equation or expression, return a function that evaluates
+the convex relaxation of the expression or the equation's right-hand side
+and a list of correctly ordered arguments to this new function. To get
+evaluator functions for {lower bound, upper bound, convex relaxation,
+concave relaxation}, use `all_evaluators`.
+
+# Example
+
+A representative use case is as follows:
+```
+@variables x, y
+to_evaluate = 1 + x*y
+evaluator, ordering = convex_evaluator(to_evaluate)
+```
+
+The same could be accomplished if `to_evaluate` were an Equation such as
+`0 ~ 1 + x*y`, although it is important to note that the left-hand side
+of such an equation is irrelevant for this function. In this example,
+the "ordering" object is now the vector `Num[xcc, xcv, xhi, xlo, ycc, ycv, yhi, ylo]`,
+indicating the correct arguments and argument order to give to `evaluator`.
+The names of these arguments are dependent on the variables used in the 
+`to_evaluate` expression and are, in general, the variable name(s) with an 
+appended `cv` and `cc` for the convex/concave values of the variables 
+(i.e., the point you wish to evaluate), `hi` for the variable's upper 
+bound, and `lo` for the variable's lower bound. Variables such as `x[1]` 
+will instead be represented as `x_1_cv` or equivalent. 
+
+The expression's convex relaxation can now be evaluated at a specific point 
+`(x,y)` by setting `x = xcv = xcc` and `y = ycv = ycc`, and `x` and `y`'s upper
+and lower bounds to `xhi`, `yhi`, and `xlo`, `ylo`, respectively. E.g., 
+to evaluate `to_evaluate`'s convex relaxation on the box `[0, 5]*[1, 3]`
+at the point `(2.5, 2)`, you can type:
+`evaluator(2.5, 2.5, 5.0, 0.0, 2.0, 2.0, 3.0, 1.0)`.
+
+The `evaluator` function can also be broadcast, including over CuArrays.
+E.g., to evaluate the convex relaxation of the `to_evaluate` expression
+at 10,000 random points on the box `[0, 1]*[0, 1]` using a GPU, you could type:
+```
+x_cv = CUDA.rand(10000)
+x_cc = CUDA.rand(10000)
+x_hi = CUDA.ones(10000)
+x_lo = CUDA.zeros(10000)
+y_cv = CUDA.rand(10000)
+y_cc = CUDA.rand(10000)
+y_hi = CUDA.ones(10000)
+y_lo = CUDA.zeros(10000)
+out = evaluator.(x_cc, x_cv, x_hi, x_lo, y_cc, y_cv, y_hi, y_lo)
+as_array = Array(out)
+```
+"""
+function convex_evaluator(equation::Equation)
+    # Apply the McCormickIntervalTransform to get expanded equations
+    # defining the relaxations of the equation
+    step_1 = apply_transform(McCormickIntervalTransform(), [equation])
+
+    # Recursively substitute intermediate variables to get down to
+    # 4 equations, representing the original equation's lower bound,
+    # upper bound, convex relaxation, and concave relaxation
+    step_2 = shrink_eqs(step_1)
+
+    # Extract all the variables from the smaller equation set and
+    # organize them alphabetically
+    ordered_vars = pull_vars(step_2)
+
+    # Create the new function. This works by calling Symbolics.build_function,
+    # which creates a function as an Expr that evaluates build_function's first
+    # argument, with the next argument(s) as the function's input(s). If we
+    # set expression=Val{false}, build_function will return a compiled function
+    # as a RuntimeGeneratedFunction, which we do NOT want as this is not 
+    # GPU-compatible. Instead, we keep expression=Val{true} (technically this is
+    # the default) and we set new_func to be the evaluation of the returned Expr,
+    # which is now a callable function. This line is delicate--don't change unless
+    # you know what you're doing!
+    @eval new_func = $(build_function(step_2[3].rhs, ordered_vars..., expression=Val{true}))
+
+    return new_func, ordered_vars
+end
+
+function convex_evaluator(term::Num)
+    # Same as the version with ::Equation as the input, but allows for
+    # more intuitive input. I.e., not making an equation where the LHS
+    # is meaningless. Since we need an equation to apply transforms,
+    # though, we just make an equation anyway (with a meaningless LHS)
+    equation = 0 ~ term
+
+    # And now everything is the same as the other version of this function
+    step_1 = apply_transform(McCormickIntervalTransform(), [equation])
+    step_2 = shrink_eqs(step_1)
+    ordered_vars = pull_vars(step_2)
+    @eval new_func = $(build_function(step_2[3].rhs, ordered_vars..., expression=Val{true}))
+    return new_func, ordered_vars
+end
+
+"""
+    all_evaluators(::Equation)
+    all_evaluators(::Num)
+
+See `convex_evaluator`. This function performs the same task, but returns
+four functions (representing lower bound, upper bound, convex relaxation,
+and concave relaxation evaluation functions) and the order vector.
+"""
+function all_evaluators(equation::Equation)
+    step_1 = apply_transform(McCormickIntervalTransform(), [equation])
+    step_2 = shrink_eqs(step_1)
+    ordered_vars = pull_vars(step_2)
+    @eval lo_evaluator = $(build_function(step_2[1].rhs, ordered_vars..., expression=Val{true}))
+    @eval hi_evaluator = $(build_function(step_2[2].rhs, ordered_vars..., expression=Val{true}))
+    @eval cv_evaluator = $(build_function(step_2[3].rhs, ordered_vars..., expression=Val{true}))
+    @eval cc_evaluator = $(build_function(step_2[4].rhs, ordered_vars..., expression=Val{true}))
+    return lo_evaluator, hi_evaluator, cv_evaluator, cc_evaluator, ordered_vars
+end
+function all_evaluators(term::Num)
+    equation = 0 ~ term
+    step_1 = apply_transform(McCormickIntervalTransform(), [equation])
+    step_2 = shrink_eqs(step_1)
+    ordered_vars = pull_vars(step_2)
+    @eval lo_evaluator = $(build_function(step_2[1].rhs, ordered_vars..., expression=Val{true}))
+    @eval hi_evaluator = $(build_function(step_2[2].rhs, ordered_vars..., expression=Val{true}))
+    @eval cv_evaluator = $(build_function(step_2[3].rhs, ordered_vars..., expression=Val{true}))
+    @eval cc_evaluator = $(build_function(step_2[4].rhs, ordered_vars..., expression=Val{true}))
+    return lo_evaluator, hi_evaluator, cv_evaluator, cc_evaluator, ordered_vars
 end

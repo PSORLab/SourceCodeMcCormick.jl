@@ -19,9 +19,6 @@ function var_names(::McCormickTransform, s::Real)
     return s, s
 end
 function var_names(::McCormickTransform, s::Term{Real, Nothing}) #Any terms like "Differential"
-    if length(s.arguments)>1
-        error("Multiple arguments not supported.")
-    end
     if typeof(s.arguments[1])<:Term #then it has args
         args = Symbol[]
         for i in s.arguments[1].arguments
@@ -31,8 +28,13 @@ function var_names(::McCormickTransform, s::Term{Real, Nothing}) #Any terms like
         var_cv = genvar(Symbol(string(var)*"_cv"), args)
         var_cc = genvar(Symbol(string(var)*"_cc"), args)
     elseif typeof(s.arguments[1])<:Sym #Then it has no args
-        var_cv = genparam(Symbol(string(s.arguments[1].name)*"_cv"))
-        var_cc = genparam(Symbol(string(s.arguments[1].name)*"_cc"))
+        if length(s.arguments)==1
+            var_cv = genparam(Symbol(string(s.arguments[1].name)*"_cv"))
+            var_cc = genparam(Symbol(string(s.arguments[1].name)*"_cc"))
+        else
+            var_cv = genparam(Symbol(string(s.arguments[1].name)*"_"*string(s.arguments[2])*"_cv"))
+            var_cc = genparam(Symbol(string(s.arguments[1].name)*"_"*string(s.arguments[2])*"_cc"))
+        end
     else
         error("Type of argument invalid")
     end
@@ -105,7 +107,7 @@ end
 line_expr(x, xL, xU, zL, zU) = IfElse.ifelse(zU > zL, (zL*(xU - x) + zU*(x - xL))/(xU - xL), zU)
 
 # A symbolic way of computing the mid of three numbers (returns IfElse block)
-mid_expr(a, b, c) = IfElse.ifelse((a < b) && (b < c), y, IfElse.ifelse((c < b) && (b < a), b,
-                    IfElse.ifelse((b < a) && (a < c), x, IfElse.ifelse((c < a) && (a < b), a, c))))
+mid_expr(a, b, c) = IfElse.ifelse(a < b, IfElse.ifelse(b < c, b, IfElse.ifelse(c < a, a, c)),
+                        IfElse.ifelse(c < b, b, IfElse.ifelse(a < c, a, c)))
 
 include(joinpath(@__DIR__, "rules.jl"))

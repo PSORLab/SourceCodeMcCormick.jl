@@ -1,0 +1,15 @@
+name = "SourceCodeMcCormick"
+uuid = "a7283dc5-4ecf-47fb-a95b-1412723fc960"
+authors = ["Robert Gottlieb <Robert.x.gottlieb@uconn.edu>"]
+version = "0.1.0"
+
+[deps]
+DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
+IfElse = "615f187c-cbe4-4ef1-ba3b-2fcf58d6d173"
+ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
+SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
+
+[compat]
+IfElse = "0.1.0 - 1.1.1"
+ModelingToolkit = "~8"
+SymbolicUtils = "~0.19"
