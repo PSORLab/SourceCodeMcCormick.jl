@@ -46,11 +46,9 @@ xMC = MC{1, NS}(2.5, Interval(-1.0, 4.0), 1)
 
 @btime xMC*(15+xMC)^2
 # 228.381 ns (15 allocations: 384 bytes)
-# MC{1, NS}(683.5, 952.0, [-361, 1444], [501.0], [328.0], false)
 
 @btime x_cv_eval(2.5, 2.5, 4.0, -1.0)
 # 30.382 ns (1 allocation: 16 bytes)
-# 683.5
 ```
 
 This is not an *entirely* fair example because the operation with xMC is simultaneously calculating
@@ -68,22 +66,27 @@ using CUDA
 
 # Using McCormick.jl
 xMC_array = MC{1,NS}.(rand(10000), Interval.(zeros(10000), ones(10000)), ones(Int, 10000))
+
 @btime xMC_array.*(15 .+ xMC_array).^2
 # 1.616 ms (120012 allocations: 2.37 MiB)
+
 
 # Using SourceCodeMcCormick.jl, broadcast using CPU
 xcc = rand(10000)
 xcv = copy(xcc)
 xhi = ones(10000)
 xlo = zeros(10000)
+
 @btime x_cv_eval.(xcc, xcv, xhi, xlo)
 # 100.100 μs (4 allocations: 78.27 KiB)
+
 
 # Using SourceCodeMcCormick.jl and CUDA.jl, broadcast using GPU
 xcc_GPU = cu(xcc)
 xcv_GPU = cu(xcv)
 xhi_GPU = cu(xhi)
 xlo_GPU = cu(xlo)
+
 @btime x_cv_eval.(xcc_GPU, xcv_GPU, xhi_GPU, xlo_GPU)
 # 6.575 μs (33 allocations: 2.34 KiB)
 ```
