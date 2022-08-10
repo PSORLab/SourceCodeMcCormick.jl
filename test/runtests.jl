@@ -1,10 +1,9 @@
-using Test, SourceCodeMcCormick, Symbolics, McCormick
+using SourceCodeMcCormick, McCormick, Symbolics, Test
 
 function eval_check(eval_func, MC1, MC2)
     return eval_func(MC1.cc, MC1.cv, MC1.Intv.hi, 
             MC1.Intv.lo, MC2.cc, MC2.cv, MC2.Intv.hi, MC2.Intv.lo)
 end
-
 
 @testset "Multiplication" begin
     @variables x, y

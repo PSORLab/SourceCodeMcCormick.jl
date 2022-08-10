@@ -50,7 +50,6 @@ function apply_transform(transform::T, prob::ODESystem) where T<:AbstractTransfo
     return new_sys
 end
 
-# Separate case for applying transform to only a set of equations
 function apply_transform(transform::T, eqn_vector::Vector{Equation}) where T<:AbstractTransform
 
     # Factorize all model equations to generate a new set of equations
@@ -85,6 +84,7 @@ function apply_transform(transform::T, eqn_vector::Vector{Equation}) where T<:Ab
 
     return new_equations
 end
+
 function apply_transform(transform::T, eqn::Equation) where T<:AbstractTransform
 
     # Factorize the equations to generate a new set of equations
@@ -116,6 +116,7 @@ function apply_transform(transform::T, eqn::Equation) where T<:AbstractTransform
 
     return new_equations
 end
+
 function apply_transform(transform::T, num::Num) where T<:AbstractTransform
 
     # Factorize the equations to generate a new set of equations

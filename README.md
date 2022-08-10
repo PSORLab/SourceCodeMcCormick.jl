@@ -7,8 +7,6 @@ take set-valued McCormick objects and utilize McCormick relaxation rules to over
 return a new symbolic expression representing those relaxations. This functionality is designed to be
 used for both algebraic and dynamic systems.
 
-Experimental Approach to McCormick Relaxation Source-Code Transformation for Differential Inequalities
-
 ## Algebraic Systems
 
 For a given algebraic equation or system of equations, `SourceCodeMcCormick` is designed to provide
