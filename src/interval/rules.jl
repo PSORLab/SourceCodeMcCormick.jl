@@ -36,22 +36,22 @@ function transform_rule(::IntervalTransform, ::typeof(-), zL, zU, xL, xU, yL, yU
     return rl, ru
 end
 function transform_rule(::IntervalTransform, ::typeof(*), zL, zU, xL, xU, yL, yU)
-    rl = Equation(zL, IfElse.ifelse(yL >= 0.0, 
-        IfElse.ifelse(xL >= 0.0, xL*yL,
-            IfElse.ifelse(xU <= 0.0, xL*yU, xL*yU)),
-        IfElse.ifelse(yU <= 0.0,
-            IfElse.ifelse(xL >= 0.0, xU*yL,
-                IfElse.ifelse(xU <= 0.0, xU*yU, xU*yL)),
-            IfElse.ifelse(xL > 0.0, xU*yL,
-                IfElse.ifelse(xU < 0.0, xL*yU, min(xU*yL, xU*yU))))))
-    ru = Equation(zU, IfElse.ifelse(yL >= 0.0, 
-        IfElse.ifelse(xL >= 0.0, xU*yU,
-            IfElse.ifelse(xU <= 0.0, xU*yL, xU*yU)),
-        IfElse.ifelse(yU <= 0.0,
-            IfElse.ifelse(xL >= 0.0, xL*yU,
-                IfElse.ifelse(xU <= 0.0, xL*yL, xL*yL)),
-            IfElse.ifelse(xL > 0.0, xU*yU,
-                IfElse.ifelse(xU < 0.0, xL*yL, max(xL*yL, xU*yU))))))
+    rl = Equation(zL, IfElse.ifelse(yL >= 0.0, #x*pos
+        IfElse.ifelse(xL >= 0.0, xL*yL, #pos*pos
+            IfElse.ifelse(xU <= 0.0, xL*yU, xL*yU)), #neg*pos, mix*pos
+        IfElse.ifelse(yU <= 0.0, #x*neg
+            IfElse.ifelse(xL >= 0.0, xU*yL, #pos*neg
+                IfElse.ifelse(xU <= 0.0, xU*yU, xU*yL)), #neg*neg, mix*neg
+            IfElse.ifelse(xL > 0.0, xU*yL, #(pos)*mix
+                IfElse.ifelse(xU < 0.0, xL*yU, min(xL*yU, xU*yL)))))) #(neg)*mix, mix*mix
+    ru = Equation(zU, IfElse.ifelse(yL >= 0.0,  #x*pos
+        IfElse.ifelse(xL >= 0.0, xU*yU, #pos*pos
+            IfElse.ifelse(xU <= 0.0, xU*yL, xU*yU)), #neg*pos, mix*pos
+        IfElse.ifelse(yU <= 0.0, #x*neg
+            IfElse.ifelse(xL >= 0.0, xL*yU, #pos*neg
+                IfElse.ifelse(xU <= 0.0, xL*yL, xL*yL)), #neg*neg, mix*neg
+            IfElse.ifelse(xL > 0.0, xU*yU, #pos*mix
+                IfElse.ifelse(xU < 0.0, xL*yL, max(xL*yL, xU*yU)))))) #neg*mix, mix*mix
     return rl, ru
 end
 

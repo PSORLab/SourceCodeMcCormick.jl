@@ -50,28 +50,27 @@ end
 function transform_rule(::McCormickTransform, ::typeof(*), zL, zU, zcv, zcc, xL, xU, xcv, xcc, yL, yU, ycv, ycc)
     rcv = Equation(zcv, IfElse.ifelse(xL >= 0.0,
         IfElse.ifelse(yL >= 0.0, max(yU*xcv + xU*ycv - xU*yU, yL*xcv + xL*ycv - xL*yL),
-            IfElse.ifelse(yU <= 0.0, -max((-yU)*xcv + xU*(-ycv) - xU*(-yU), (-yL)*xcv + xL*(-ycv) - xL*(-yL)), 
+            IfElse.ifelse(yU <= 0.0, -min((-yU)*xcc + xU*(-ycv) - xU*(-yU), (-yL)*xcc + xU*(-ycv) - xL*(-yL)),
                 max(yU*xcv + xU*ycv - xU*yU, yL*xcc + xL*ycv - xL*yL))),
         IfElse.ifelse(xU <= 0.0,
-            IfElse.ifelse(yL >= 0.0, -max(yU*(-xcv) + (-xU)*ycv - (-xU)*yU, yL*(-xcv) + (-xL)*ycv - (-xL)*yL),
-                IfElse.ifelse(yU <= 0.0, max(yU*xcv + xU*ycv - xU*yU, yL*xcv + xL*ycv - xL*yL), 
-                    -max(yU*(-xcv) + (-xU)*ycv - (-xU)*yU, yL*(-xcc) + (-xL)*ycv - (-xL)*yL))),
+            IfElse.ifelse(yL >= 0.0, -min(yL*(-xcv) + (-xL)*ycc - (-xL)*yL, yU*(-xcv) + (-xU)*ycc - (-xU)*yU),
+                IfElse.ifelse(yU <= 0.0, max(yL*xcc + xL*ycc - xL*yL, yU*xcc + xU*ycc - xU*yU),
+                    -min(yL*(-xcc) + (-xL)*ycc - (-xL)*yL, yU*(-xcv) + (-xU)*ycc - (-xU)*yU))),
             IfElse.ifelse(yL >= 0.0, max(xU*ycv + yU*xcv - yU*xU, xL*ycc + yL*xcv - yL*xL),
-                IfElse.ifelse(yU <= 0.0, -max(xU*(-ycv) + (-yU)*xcv - (-yU)*xU, xL*(-ycc) + (-yL)*xcv - (-yL)*xL), 
+                IfElse.ifelse(yU <= 0.0, -min(xL*(-ycc) + (-yL)*xcc - (-yL)*xL, xU*(-ycv) + (-yU)*xcc - (-yU)*xU), 
                     max(yU*xcv + xU*ycv - xU*yU, yL*xcc + xL*ycc - xL*yL))))))
     rcc = Equation(zcc, IfElse.ifelse(xL >= 0.0,
-        IfElse.ifelse(yL >= 0.0, min(yL*xcc + xU*ycc - xU*yL, yU*xcc + xU*ycc - xL*yU),
-            IfElse.ifelse(yU <= 0.0, -min((-yL)*xcc + xU*(-ycc) - xU*(-yL), (-yU)*xcc + xU*(-ycc) - xL*(-yU)), 
+        IfElse.ifelse(yL >= 0.0, min(yL*xcc + xU*ycc - xU*yL, yU*xcc + xL*ycc - xL*yU),
+            IfElse.ifelse(yU <= 0.0, -max((-yL)*xcv + xU*(-ycc) - xU*(-yL), (-yU)*xcv + xL*(-ycc) - xL*(-yU)),
                 min(yL*xcv + xU*ycc - xU*yL, yU*xcc + xL*ycc - xL*yU))),
         IfElse.ifelse(xU <= 0.0,
-            IfElse.ifelse(yL >= 0.0, -min(yL*(-xcc) + (-xU)*ycc - (-xU)*yL, yU*(-xcc) + (-xU)*ycc - (-xL)*yU),
-                IfElse.ifelse(yU <= 0.0, min(yL*xcc + xU*ycc - xU*yL, yU*xcc + xU*ycc - xL*yU), 
-                    -min(yL*(-xcv) + (-xU)*ycc - (-xU)*yL, yU*(-xcc) + (-xL)*ycc - (-xL)*yU))),
+            IfElse.ifelse(yL >= 0.0, -max(yU*(-xcc) + (-xL)*ycv - (-xL)*yU, yL*(-xcc) + (-xU)*ycv - (-xU)*yL),
+                 IfElse.ifelse(yU <= 0.0, min(yU*xcv + xL*ycv - xL*yU, yL*xcv + xL*ycv - xU*yL),
+                    -max(yU*(-xcc) + (-xL)*ycv - (-xL)*yU, yL*(-xcv) + (-xU)*ycv - (-xU)*yL))),
             IfElse.ifelse(yL >= 0.0, min(xL*ycv + yU*xcc - yU*xL, xU*ycc + yL*xcc - yL*xU),
-                IfElse.ifelse(yU <= 0.0, -min(xL*(-ycv) + (-yU)*xcc - (-yU)*xL, xU*(-ycc) + (-yL)*xcc - (-yL)*xU), 
+                IfElse.ifelse(yU <= 0.0, -max(xU*(-ycc) + (-yL)*xcv - (-yL)*xU, xL*(-ycv) + (-yU)*xcv - (-yU)*xL), 
                     min(yL*xcv + xU*ycc - xU*yL, yU*xcc + xL*ycv - xL*yU))))))
     return rcv, rcc
-
     
     # # This is the base if-else tree for the 9 multiplication cases. I think for the transform rule,
     # # the way this code needs to work, the entire tree needs to be available to the solver since
@@ -90,13 +89,13 @@ function transform_rule(::McCormickTransform, ::typeof(*), zL, zU, zcv, zcc, xL,
     # # [x+,y+]
     # # Normal case of multiply_STD_NS
     # cv = max(yU*xcv + xU*ycv - xU*yU, yL*xcv + xL*ycv - xL*yL)
-    # cc = min(yL*xcc + xU*ycc - xU*yL, yU*xcc + xU*ycc - xL*yU)
+    # cc = min(yL*xcc + xU*ycc - xU*yL, yU*xcc + xL*ycc - xL*yU) #typo fixed
 
     # # [x+,y-]
-    # # This returns -mult_kernel(x, -y), so put a negative in front, and then
-    # # replace do [x+,y+] but replace all y's with -y because y's are secretly negative?
-    # cv = -max((-yU)*xcv + xU*(-ycv) - xU*(-yU), (-yL)*xcv + xL*(-ycv) - xL*(-yL))
-    # cc = -min((-yL)*xcc + xU*(-ycc) - xU*(-yL), (-yU)*xcc + xU*(-ycc) - xL*(-yU))
+    # # This returns -mult_kernel(x, -y), so it's [x+, y+] but with y's all flipped,
+    # # and then swap and negate cv/cc
+    # cv = -min((-yU)*xcc + xU*(-ycv) - xU*(-yU), (-yL)*xcc + xU*(-ycv) - xL*(-yL))
+    # cc = -max((-yL)*xcv + xU*(-ycc) - xU*(-yL), (-yU)*xcv + xL*(-ycc) - xL*(-yU))
 
 
     # # [x+,ym]
@@ -106,23 +105,37 @@ function transform_rule(::McCormickTransform, ::typeof(*), zL, zU, zcv, zcc, xL,
 
 
     # # [x-,y+]
-    # # This returns -mult_kernel(-x, y). Negative in front, replace x's with -x's
-    # cv = -max(yU*(-xcv) + (-xU)*ycv - (-xU)*yU, yL*(-xcv) + (-xL)*ycv - (-xL)*yL)
-    # cc = -min(yL*(-xcc) + (-xU)*ycc - (-xU)*yL, yU*(-xcc) + (-xU)*ycc - (-xL)*yU)
+    # # This returns -mult_kernel(-x, y). Replace x with flipped x, then swap/negate cv/cc
+    # [x+, y+]
+    # cv = max(yU*xcv + xU*ycv - xU*yU, yL*xcv + xL*ycv - xL*yL)
+    # cc = min(yL*xcc + xU*ycc - xU*yL, yU*xcc + xL*ycc - xL*yU)
+    # Then flip x's
+    # cv = max(yU*(-xcc) + (-xL)*ycv - (-xL)*yU, yL*(-xcc) + (-xU)*ycv - (-xU)*yL)
+    # cc = min(yL*(-xcv) + (-xL)*ycc - (-xL)*yL, yU*(-xcv) + (-xU)*ycc - (-xU)*yU)
+    # Then swap/negate cv/cc
+    # cv = -min(yL*(-xcv) + (-xL)*ycc - (-xL)*yL, yU*(-xcv) + (-xU)*ycc - (-xU)*yU)
+    # cc = -max(yU*(-xcc) + (-xL)*ycv - (-xL)*yU, yL*(-xcc) + (-xU)*ycv - (-xU)*yL)
 
 
     # # [x-,y-]
-    # # This returns mult_kernel(-x,-y), but since each term is of the form x_*y_, 
-    # # (-x)*(-y)=xy, so no change from the "normal case"
-    # cv = max(yU*xcv + xU*ycv - xU*yU, yL*xcv + xL*ycv - xL*yL)
-    # cc = min(yL*xcc + xU*ycc - xU*yL, yU*xcc + xU*ycc - xL*yU)
+    # # This returns mult_kernel(-x,-y). Swap x with flipped x and y with flipped
+    # # y, and since both are flipped, no need to worry about negative signs
+    # cv = max(yL*xcc + xL*ycc - xL*yL, yU*xcc + xU*ycc - xU*yU)
+    # cc = min(yU*xcv + xL*ycv - xL*yU, yL*xcv + xL*ycv - xU*yL)
 
 
     # # [x-,ym]
-    # # This returns -mult_kernel(y,-x). Negative in front, then we're doing [xm, y+], 
-    # # but swap x's and y's and replace x's with (-x)'s
-    # cv = -max(yU*(-xcv) + (-xU)*ycv - (-xU)*yU, yL*(-xcc) + (-xL)*ycv - (-xL)*yL)
-    # cc = -min(yL*(-xcv) + (-xU)*ycc - (-xU)*yL, yU*(-xcc) + (-xL)*ycc - (-xL)*yU)
+    # # This returns -mult_kernel(y,-x). So we do [xm, y+] but replace x's with y's,
+    # # and y's with flipped x's. Then swap and negate cv/cc
+    # This is [xm, y+]
+    # cv = max(xU*ycv + yU*xcv - yU*xU, xL*ycc + yL*xcv - yL*xL)
+    # cc = min(xL*ycv + yU*xcc - yU*xL, xU*ycc + yL*xcc - yL*xU)
+    # Do the swaps:
+    # cv = max(yU*(-xcc) + (-xL)*ycv - (-xL)*yU, yL*(-xcv) + (-xU)*ycv - (-xU)*yL)
+    # cc = min(yL*(-xcc) + (-xL)*ycc - (-xL)*yL, yU*(-xcv) + (-xU)*ycc - (-xU)*yU)
+    # Now swap definitions
+    # cv = -min(yL*(-xcc) + (-xL)*ycc - (-xL)*yL, yU*(-xcv) + (-xU)*ycc - (-xU)*yU)
+    # cc = -max(yU*(-xcc) + (-xL)*ycv - (-xL)*yU, yL*(-xcv) + (-xU)*ycv - (-xU)*yL)
 
 
     # # [xm,y+]
@@ -133,10 +146,17 @@ function transform_rule(::McCormickTransform, ::typeof(*), zL, zU, zcv, zcc, xL,
 
 
     # # [xm,y-]
-    # # This one returns -mult_kernel(-y, x). So copy [x+,ym], but swap x's
-    # # and y's, then replace y with (-y), and negative in front
-    # cv = -max(xU*(-ycv) + (-yU)*xcv - (-yU)*xU, xL*(-ycc) + (-yL)*xcv - (-yL)*xL)
-    # cc = -min(xL*(-ycv) + (-yU)*xcc - (-yU)*xL, xU*(-ycc) + (-yL)*xcc - (-yL)*xU)
+    # # This one returns -mult_kernel(-y, x). So copy [x+,ym], but replace y with x,
+    # and x with (-y), and then swap/negate cv/cc
+    # [x+, ym]
+    # cv = max(yU*xcv + xU*ycv - xU*yU, yL*xcc + xL*ycv - xL*yL)
+    # cc = min(yL*xcv + xU*ycc - xU*yL, yU*xcc + xL*ycc - xL*yU)
+    # swap y with x, x with (-y)
+    # cv = max(xU*(-ycc) + (-yL)*xcv - (-yL)*xU, xL*(-ycv) + (-yU)*xcv - (-yU)*xL)
+    # cc = min(xL*(-ycc) + (-yL)*xcc - (-yL)*xL, xU*(-ycv) + (-yU)*xcc - (-yU)*xU)
+    # And now swap/negate
+    # cv = -min(xL*(-ycc) + (-yL)*xcc - (-yL)*xL, xU*(-ycv) + (-yU)*xcc - (-yU)*xU)
+    # cc = -max(xU*(-ycc) + (-yL)*xcv - (-yL)*xU, xL*(-ycv) + (-yU)*xcv - (-yU)*xL)
 
 
     # # [xm,ym]
