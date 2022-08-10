@@ -1,7 +1,7 @@
 name = "SourceCodeMcCormick"
 uuid = "a7283dc5-4ecf-47fb-a95b-1412723fc960"
 authors = ["Robert Gottlieb <Robert.x.gottlieb@uconn.edu>"]
-version = "0.1.0"
+version = "1.0.0"
 
 [deps]
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
