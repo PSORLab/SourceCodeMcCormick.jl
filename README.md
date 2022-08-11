@@ -151,7 +151,7 @@ using `DiffEqGPU.jl`.
 ## Limitations
 
 Currently, as proof-of-concept, `SourceCodeMcCormick` can only handle functions with 
-addition (+), subtraction (-), multiplication (\*), powers of 2 (^2), natural base
+addition (+), subtraction (-), multiplication (\*), division (/), powers of 2 (^2), natural base
 exponentials (exp), and minimum/maximum (min/max) expressions. Future work will include
 adding other operations found in `McCormick.jl`. 
 

@@ -55,6 +55,40 @@ function transform_rule(::IntervalTransform, ::typeof(*), zL, zU, xL, xU, yL, yU
     return rl, ru
 end
 
+function transform_rule(::IntervalTransform, ::typeof(/), zL, zU, xL, xU, yL, yU)
+    rl = Equation(zL, IfElse.ifelse(yL > 0.0,
+        IfElse.ifelse(xL >= 0.0, xL/yU, #y strictly positive
+            IfElse.ifelse(xU <= 0.0, xL/yL, xL/yL)),
+        IfElse.ifelse(yU < 0.0, #y strictly negative
+            IfElse.ifelse(xL >= 0.0, xU/yU,
+                IfElse.ifelse(xU <= 0.0, xU/yL, xU/yU)),
+            IfElse.ifelse(yL == 0.0, # y contains 0 and at least yL is 0
+                IfElse.ifelse(xL >= 0.0, IfElse.ifelse(yU == 0.0, NaN, IfElse.ifelse(xU == 0.0, 0.0, xL/yU)),
+                    IfElse.ifelse(xU <= 0.0, IfElse.ifelse(yU == 0.0, NaN, IfElse.ifelse(xL == 0.0, 0.0, NaN)),
+                        NaN)),
+                IfElse.ifelse(yU == 0.0, #y contains 0 and yU is 0 but not yL
+                    IfElse.ifelse(xL >= 0.0, IfElse.ifelse(xU == 0.0, 0.0, NaN),
+                        IfElse.ifelse(xU <= 0.0, IfElse.ifelse(xL == 0.0, 0.0, xU/yL),
+                            NaN)),
+                    NaN)))))
+    ru = Equation(zU, IfElse.ifelse(yL > 0.0,
+        IfElse.ifelse(xL >= 0.0, xU/yL, #y strictly positive
+            IfElse.ifelse(xU <= 0.0, xU/yU, xU/yL)),
+        IfElse.ifelse(yU < 0.0, #y strictly negative
+            IfElse.ifelse(xL >= 0.0, xL/yL,
+                IfElse.ifelse(xU <= 0.0, xL/yU, xL/yU)),
+            IfElse.ifelse(yL == 0.0, # y contains 0 and at least yL is 0
+                IfElse.ifelse(xL >= 0.0, IfElse.ifelse(yU == 0.0, NaN, IfElse.ifelse(xU == 0.0, 0.0, NaN)),
+                    IfElse.ifelse(xU <= 0.0, IfElse.ifelse(yU == 0.0, NaN, IfElse.ifelse(xL == 0.0, 0.0, xU/yU)),
+                        NaN)),
+                IfElse.ifelse(yU == 0.0, #y contains 0 and yU is 0 but not yL
+                    IfElse.ifelse(xL >= 0.0, IfElse.ifelse(xU == 0.0, 0.0, xL/yL),
+                        IfElse.ifelse(xU <= 0.0, IfElse.ifelse(xL == 0.0, 0.0, NaN),
+                            NaN)),
+                        NaN)))))
+    return rl, ru
+end
+
 
 function transform_rule(::IntervalTransform, ::typeof(min), zL, zU, xL, xU, yL, yU)
     rl = Equation(zL, min(xL, yL))

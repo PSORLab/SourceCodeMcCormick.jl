@@ -165,6 +165,51 @@ function transform_rule(::McCormickTransform, ::typeof(*), zL, zU, zcv, zcc, xL,
 
 end
 
+function transform_rule(::McCormickTransform, ::typeof(/), zL, zU, zcv, zcc, xL, xU, xcv, xcc, yL, yU, ycv, ycc)
+    # For division, we do x*(y^-1). First we make a NaN-checker to see if
+    # the denominator contains 0
+    NaN_check = IfElse.ifelse(yL < 0.0, IfElse.ifelse(yU > 0.0, NaN, 1.0), 1.0)
+
+    # Next we calculate the inverse of y
+    yL_inv = inv(yU)
+    yU_inv = inv(yL)
+    ycv_inv = IfElse.ifelse(yL > 0.0, IfElse.ifelse(yU <= ycv, 1.0 ./ ycv, 
+            IfElse.ifelse(yU >= ycc, 1.0 ./ ycc, 1.0 ./ yU)),
+        IfElse.ifelse(yU < 0.0, IfElse.ifelse(yL == yU, mid_expr(ycc, ycv, yL).^(-1), 
+            ((yL.^(-1))*(yU - mid_expr(ycc, ycv, yL)) + (yU.^(-1))*(mid_expr(ycc, ycv, yL) - yL))./(yU - yL)),
+                NaN))
+    ycc_inv = IfElse.ifelse(yL > 0.0, IfElse.ifelse(yL <= ycv, (yU + yL - ycv)./(yL*yU), 
+                IfElse.ifelse(yL >= ycc, (yU + yL - ycc)./(yL*yU), 1.0 ./ yL)),
+            IfElse.ifelse(yU < 0.0, mid_expr(ycc, ycv, yU).^(-1),
+                NaN))
+
+    # Now we use the multiplication rules, but replacing each instance of
+    # y with its inverse. 
+    rcv = Equation(zcv, IfElse.ifelse(xL >= 0.0,
+        IfElse.ifelse(yL_inv >= 0.0, max(yU_inv*xcv + xU*ycv_inv - xU*yU_inv, yL_inv*xcv + xL*ycv_inv - xL*yL_inv),
+            IfElse.ifelse(yU_inv <= 0.0, -min((-yU_inv)*xcc + xU*(-ycv_inv) - xU*(-yU_inv), (-yL_inv)*xcc + xU*(-ycv_inv) - xL*(-yL_inv))*NaN_check,
+                max(yU_inv*xcv + xU*ycv_inv - xU*yU_inv, yL_inv*xcc + xL*ycv_inv - xL*yL_inv)*NaN_check)),
+        IfElse.ifelse(xU <= 0.0,
+            IfElse.ifelse(yL_inv >= 0.0, -min(yL_inv*(-xcv) + (-xL)*ycc_inv - (-xL)*yL_inv, yU_inv*(-xcv) + (-xU)*ycc_inv - (-xU)*yU_inv)*NaN_check,
+                IfElse.ifelse(yU_inv <= 0.0, max(yL_inv*xcc + xL*ycc_inv - xL*yL_inv, yU_inv*xcc + xU*ycc_inv - xU*yU_inv)*NaN_check,
+                    -min(yL_inv*(-xcc) + (-xL)*ycc_inv - (-xL)*yL_inv, yU_inv*(-xcv) + (-xU)*ycc_inv - (-xU)*yU_inv)*NaN_check)),
+            IfElse.ifelse(yL_inv >= 0.0, max(xU*ycv_inv + yU_inv*xcv - yU_inv*xU, xL*ycc_inv + yL_inv*xcv - yL_inv*xL)*NaN_check,
+                IfElse.ifelse(yU_inv <= 0.0, -min(xL*(-ycc_inv) + (-yL_inv)*xcc - (-yL_inv)*xL, xU*(-ycv_inv) + (-yU_inv)*xcc - (-yU_inv)*xU)*NaN_check, 
+                    max(yU_inv*xcv + xU*ycv_inv - xU*yU_inv, yL_inv*xcc + xL*ycc_inv - xL*yL_inv)*NaN_check)))))
+    rcc = Equation(zcc, IfElse.ifelse(xL >= 0.0,
+        IfElse.ifelse(yL_inv >= 0.0, min(yL_inv*xcc + xU*ycc_inv - xU*yL_inv, yU_inv*xcc + xL*ycc_inv - xL*yU_inv)*NaN_check,
+            IfElse.ifelse(yU_inv <= 0.0, -max((-yL_inv)*xcv + xU*(-ycc_inv) - xU*(-yL_inv), (-yU_inv)*xcv + xL*(-ycc_inv) - xL*(-yU_inv))*NaN_check,
+                min(yL_inv*xcv + xU*ycc_inv - xU*yL_inv, yU_inv*xcc + xL*ycc_inv - xL*yU_inv)*NaN_check)),
+        IfElse.ifelse(xU <= 0.0,
+            IfElse.ifelse(yL_inv >= 0.0, -max(yU_inv*(-xcc) + (-xL)*ycv_inv - (-xL)*yU_inv, yL_inv*(-xcc) + (-xU)*ycv_inv - (-xU)*yL_inv)*NaN_check,
+                 IfElse.ifelse(yU_inv <= 0.0, min(yU_inv*xcv + xL*ycv_inv - xL*yU_inv, yL_inv*xcv + xL*ycv_inv - xU*yL_inv)*NaN_check,
+                    -max(yU_inv*(-xcc) + (-xL)*ycv_inv - (-xL)*yU_inv, yL_inv*(-xcv) + (-xU)*ycv_inv - (-xU)*yL_inv)*NaN_check)),
+            IfElse.ifelse(yL_inv >= 0.0, min(xL*ycv_inv + yU_inv*xcc - yU_inv*xL, xU*ycc_inv + yL_inv*xcc - yL_inv*xU)*NaN_check,
+                IfElse.ifelse(yU_inv <= 0.0, -max(xU*(-ycc_inv) + (-yL_inv)*xcv - (-yL_inv)*xU, xL*(-ycv_inv) + (-yU_inv)*xcv - (-yU_inv)*xL)*NaN_check, 
+                    min(yL_inv*xcv + xU*ycc_inv - xU*yL_inv, yU_inv*xcc + xL*ycv_inv - xL*yU_inv)*NaN_check)))))
+    return rcv, rcc
+end
+
 function transform_rule(::McCormickTransform, ::typeof(min), zL, zU, zcv, zcc, xL, xU, xcv, xcc, yL, yU, ycv, ycc)
     rcv = Equation(zcv, min(xcv, ycv))
     rcc = Equation(zcc, min(xcc, ycc))

@@ -10,8 +10,8 @@ end
     to_compute = x*y
     mult_lo, mult_hi, mult_cv, mult_cc, order = all_evaluators(to_compute)
 
-    xMC = MC{1,NS}(-2.0, Interval(-3.0, -1.0), 1)
-    yMC = MC{1,NS}(4.0, Interval(2.0, 6.0), 2)
+    xMC = MC{2,NS}(-2.0, Interval(-3.0, -1.0), 1)
+    yMC = MC{2,NS}(4.0, Interval(2.0, 6.0), 2)
     zMC = 0.5*xMC*yMC
     neg = zMC
     mix = zMC + 4.0
@@ -63,8 +63,8 @@ end
     to_compute = x+y
     add_lo, add_hi, add_cv, add_cc, order = all_evaluators(to_compute)
 
-    xMC = MC{1,NS}(-2.0, Interval(-3.0, -1.0), 1)
-    yMC = MC{1,NS}(4.0, Interval(2.0, 6.0), 2)
+    xMC = MC{2,NS}(-2.0, Interval(-3.0, -1.0), 1)
+    yMC = MC{2,NS}(4.0, Interval(2.0, 6.0), 2)
     zMC = 0.5*xMC*yMC
     neg = zMC
     mix = zMC + 4.0
@@ -117,8 +117,8 @@ end
     to_compute = x-y
     sub_lo, sub_hi, sub_cv, sub_cc, order = all_evaluators(to_compute)
 
-    xMC = MC{1,NS}(-2.0, Interval(-3.0, -1.0), 1)
-    yMC = MC{1,NS}(4.0, Interval(2.0, 6.0), 2)
+    xMC = MC{2,NS}(-2.0, Interval(-3.0, -1.0), 1)
+    yMC = MC{2,NS}(4.0, Interval(2.0, 6.0), 2)
     zMC = 0.5*xMC*yMC
     neg = zMC
     mix = zMC + 4.0
@@ -163,4 +163,54 @@ end
     @test eval_check(sub_cc, pos, neg) == (pos-neg).cc
     @test eval_check(sub_cc, pos, mix) == (pos-mix).cc
     @test eval_check(sub_cc, pos, pos) == (pos-pos).cc
+end
+
+
+@testset "Division" begin
+    @variables x, y
+    to_compute = x/y
+    div_lo, div_hi, div_cv, div_cc, order = all_evaluators(to_compute)
+
+    xMC = MC{2,NS}(-2.0, Interval(-3.0, -1.0), 1)
+    yMC = MC{2,NS}(4.0, Interval(2.0, 6.0), 2)
+    zMC = 0.5*xMC*yMC
+    neg = zMC
+    mix = zMC + 4.0
+    pos = zMC + 10.0
+    
+    @test abs(eval_check(div_lo, 0.99*neg, neg) - (0.99*neg/neg).Intv.lo) < 1e-15
+    @test isnan(eval_check(div_lo, neg, mix))
+    @test eval_check(div_lo, neg, pos) == (neg/pos).Intv.lo
+    @test eval_check(div_lo, mix, neg) == (mix/neg).Intv.lo
+    @test eval_check(div_lo, mix, pos) == (mix/pos).Intv.lo
+    @test eval_check(div_lo, pos, neg) == (pos/neg).Intv.lo
+    @test isnan(eval_check(div_lo, pos, mix))
+    @test abs(eval_check(div_lo, 0.99*pos, pos) - (0.99*pos/pos).Intv.lo) < 1e-15
+    
+    @test abs(eval_check(div_hi, 0.99*neg, neg) - (0.99*neg/neg).Intv.hi) < 1e-15
+    @test isnan(eval_check(div_hi, neg, mix))
+    @test eval_check(div_hi, neg, pos) == (neg/pos).Intv.hi
+    @test eval_check(div_hi, mix, neg) == (mix/neg).Intv.hi
+    @test eval_check(div_hi, mix, pos) == (mix/pos).Intv.hi
+    @test eval_check(div_hi, pos, neg) == (pos/neg).Intv.hi
+    @test isnan(eval_check(div_hi, pos, mix))
+    @test abs(eval_check(div_hi, 0.99*pos, pos) - (0.99*pos/pos).Intv.hi) < 1e-15
+    
+    @test abs(eval_check(div_cv, 0.99*neg, neg) - (0.99*neg/neg).cv) < 1e-15
+    @test isnan(eval_check(div_cv, neg, mix))
+    @test eval_check(div_cv, neg, pos) == (neg/pos).cv
+    @test eval_check(div_cv, mix, neg) == (mix/neg).cv
+    @test eval_check(div_cv, mix, pos) == (mix/pos).cv
+    @test eval_check(div_cv, pos, neg) == (pos/neg).cv
+    @test isnan(eval_check(div_cv, pos, mix))
+    @test abs(eval_check(div_cv, 0.99*pos, pos) - (0.99*pos/pos).cv) < 1e-15
+    
+    @test abs(eval_check(div_cc, 0.99*neg, neg) - (0.99*neg/neg).cc) < 1e-15
+    @test isnan(eval_check(div_cc, neg, mix))
+    @test eval_check(div_cc, neg, pos) == (neg/pos).cc
+    @test eval_check(div_cc, mix, neg) == (mix/neg).cc
+    @test eval_check(div_cc, mix, pos) == (mix/pos).cc
+    @test abs(eval_check(div_cc, pos, neg) - (pos/neg).cc) < 1e-15
+    @test isnan(eval_check(div_cc, pos, mix))
+    @test abs(eval_check(div_cc, 0.99*pos, pos) - (0.99*pos/pos).cc) < 1e-15    
 end

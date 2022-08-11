@@ -5,6 +5,7 @@ arity(a::Term{Real, Nothing}) = 1
 arity(a::SymbolicUtils.Add) = length(a.dict) + (~iszero(a.coeff))
 arity(a::SymbolicUtils.Mul) = length(a.dict) + (~isone(a.coeff))
 arity(a::SymbolicUtils.Pow) = 2
+arity(a::SymbolicUtils.Div) = 2
 
 op(a::Equation) = op(a.rhs)
 op(::SymbolicUtils.Add) = +
@@ -37,6 +38,12 @@ function sub_2(a::SymbolicUtils.Mul)
     ~(isone(a.coeff)) && return a.coeff
     sorted_dict = sort(collect(a.dict), by=x->string(x[1]))
     return sorted_dict[2].first
+end
+function sub_1(a::SymbolicUtils.Div)
+    return a.num
+end
+function sub_2(a::SymbolicUtils.Div)
+    return a.den
 end
 function sub_1(a::SymbolicUtils.Pow)
     return a.base
@@ -235,7 +242,6 @@ end
 function _pull_vars(term::SymbolicUtils.Add, vars::Vector{Num}, strings::Vector{String})
     args = arguments(term)
     for arg in args
-        # if (typeof(arg) == Term{Real, Nothing}) || (typeof(arg) == Sym{Real, Base.ImmutableDict{DataType, Any}})
         if (typeof(arg) <: Sym{Real, Base.ImmutableDict{DataType, Any}})
             if ~(string(arg) in strings)
                 push!(strings, string(arg))
@@ -253,7 +259,23 @@ end
 function _pull_vars(term::SymbolicUtils.Mul, vars::Vector{Num}, strings::Vector{String})
     args = arguments(term)
     for arg in args
-        # if (typeof(arg) == Term{Real, Nothing}) || (typeof(arg) == Sym{Real, Base.ImmutableDict{DataType, Any}})
+        if (typeof(arg) <: Sym{Real, Base.ImmutableDict{DataType, Any}})
+            if ~(string(arg) in strings)
+                push!(strings, string(arg))
+                push!(vars, arg)
+            end
+        elseif (typeof(arg) <: Int) || (typeof(arg) <: AbstractFloat)
+            nothing
+        else
+            vars, strings = _pull_vars(arg, vars, strings)
+        end
+    end
+    return vars, strings
+end
+
+function _pull_vars(term::SymbolicUtils.Div, vars::Vector{Num}, strings::Vector{String})
+    args = arguments(term)
+    for arg in args
         if (typeof(arg) <: Sym{Real, Base.ImmutableDict{DataType, Any}})
             if ~(string(arg) in strings)
                 push!(strings, string(arg))
@@ -271,7 +293,6 @@ end
 function _pull_vars(term::SymbolicUtils.Pow, vars::Vector{Num}, strings::Vector{String})
     args = arguments(term)
     for arg in args
-        # if (typeof(arg) == Term{Real, Nothing}) || (typeof(arg) == Sym{Real, Base.ImmutableDict{DataType, Any}})
         if (typeof(arg) <: Sym{Real, Base.ImmutableDict{DataType, Any}})
             if ~(string(arg) in strings)
                 push!(strings, string(arg))
@@ -289,7 +310,6 @@ end
 function _pull_vars(term::SymbolicUtils.Term{Real, Nothing}, vars::Vector{Num}, strings::Vector{String})
     args = arguments(term)
     for arg in args
-        # if (typeof(arg) == Term{Real, Nothing}) || (typeof(arg) == Sym{Real, Base.ImmutableDict{DataType, Any}})
         if (typeof(arg) <: Sym{Real, Base.ImmutableDict{DataType, Any}})
             if ~(string(arg) in strings)
                 push!(strings, string(arg))
@@ -307,7 +327,6 @@ end
 function _pull_vars(term::SymbolicUtils.Term{Bool, Nothing}, vars::Vector{Num}, strings::Vector{String})
     args = arguments(term)
     for arg in args
-        # if (typeof(arg) == Term{Real, Nothing}) || (typeof(arg) == Sym{Real, Base.ImmutableDict{DataType, Any}})
         if (typeof(arg) <: Sym{Real, Base.ImmutableDict{DataType, Any}})
             if ~(string(arg) in strings)
                 push!(strings, string(arg))
@@ -319,6 +338,10 @@ function _pull_vars(term::SymbolicUtils.Term{Bool, Nothing}, vars::Vector{Num}, 
             vars, strings = _pull_vars(arg, vars, strings)
         end
     end
+    return vars, strings
+end
+
+function _pull_vars(term::SymbolicUtils.Term{Float64, Nothing}, vars::Vector{Num}, strings::Vector{String})
     return vars, strings
 end
 
