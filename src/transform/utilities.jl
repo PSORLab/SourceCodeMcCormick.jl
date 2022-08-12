@@ -52,7 +52,13 @@ function sub_2(a::SymbolicUtils.Pow)
     return a.exp
 end
 
-sub_1(a::Term{Real, Nothing}) = a.arguments[1]
+function sub_1(a::Term{Real, Nothing})
+    if a.f==getindex
+        return a
+    else
+        return a.arguments[1]
+    end
+end
 sub_2(a::Term{Real, Nothing}) = a.arguments[2]
 
 
@@ -366,18 +372,17 @@ shrink_eqs(eqs, 1)
 """
 function shrink_eqs(eqs::Vector{Equation}, keep::Int64=4)
     new_eqs = eqs
-    for i in 1:length(eqs)-keep
-        new_eqs = substitute(new_eqs, Dict(new_eqs[i].lhs => new_eqs[i].rhs))
+    for _ in 1:length(eqs)-keep
+        new_eqs = substitute(new_eqs, Dict(new_eqs[1].lhs => new_eqs[1].rhs))[2:end]
     end
-    new_eqs = new_eqs[end-(keep-1):end]
     return new_eqs
 end
 
 """
-    convex_evaluator(::Equation)
     convex_evaluator(::Num)
+    convex_evaluator(::Equation)
 
-Given a symbolic equation or expression, return a function that evaluates
+Given a symbolic expression or equation, return a function that evaluates
 the convex relaxation of the expression or the equation's right-hand side
 and a list of correctly ordered arguments to this new function. To get
 evaluator functions for {lower bound, upper bound, convex relaxation,
@@ -427,75 +432,149 @@ out = evaluator.(x_cc, x_cv, x_hi, x_lo, y_cc, y_cv, y_hi, y_lo)
 as_array = Array(out)
 ```
 """
-function convex_evaluator(equation::Equation)
-    # Apply the McCormickIntervalTransform to get expanded equations
-    # defining the relaxations of the equation
-    step_1 = apply_transform(McCormickIntervalTransform(), [equation])
+function convex_evaluator(term::Num)
+    # First, check to see if the term is "Add". If so, we can get some
+    # huge time savings by separating out the expression using the knowledge
+    # that the sum of convex relaxations is equal to the convex relaxation
+    # of the sum (i.e., a_cv + b_cv = (a+b)_cv, and same for lo/hi/cc)
+    if typeof(term.val) <: SymbolicUtils.Add
+        # Start with any real-valued operands [if present]
+        cv_eqn = term.val.coeff
 
-    # Recursively substitute intermediate variables to get down to
-    # 4 equations, representing the original equation's lower bound,
-    # upper bound, convex relaxation, and concave relaxation
-    step_2 = shrink_eqs(step_1)
+        # Loop through the dictionary of operands and treat each term like
+        # its own equation
+        for (key,val) in term.val.dict
+            # "key" is the operand, "val" is its coefficient. The LHS of "equation" is irrelevant
+            equation = 0 ~ (val*key)
 
-    # Extract all the variables from the smaller equation set and
-    # organize them alphabetically
-    ordered_vars = pull_vars(step_2)
+            # Apply the McCormick transform to expand out the equation with auxiliary
+            # variables and get expressions for each variable's relaxations
+            step_1 = apply_transform(McCormickIntervalTransform(), [equation])
 
-    # Create the new function. This works by calling Symbolics.build_function,
-    # which creates a function as an Expr that evaluates build_function's first
-    # argument, with the next argument(s) as the function's input(s). If we
-    # set expression=Val{false}, build_function will return a compiled function
-    # as a RuntimeGeneratedFunction, which we do NOT want as this is not 
-    # GPU-compatible. Instead, we keep expression=Val{true} (technically this is
-    # the default) and we set new_func to be the evaluation of the returned Expr,
-    # which is now a callable function. This line is delicate--don't change unless
-    # you know what you're doing!
-    @eval new_func = $(build_function(step_2[3].rhs, ordered_vars..., expression=Val{true}))
+            # Shrink the equations down to 4 total, for "lo", "hi", "cv", and "cc"
+            step_2 = shrink_eqs(step_1)
 
+            # For "convex_evaluator" we only care about the convex part, which is #3 of 4.
+            # See "all_evaluators" if you need more than just the convex relaxation
+            cv_eqn += step_2[3].rhs
+        end
+
+        # Scan through the equation and pick out and organize all variables needed as inputs
+        ordered_vars = pull_vars(0 ~ cv_eqn)
+
+        # Create the evaluation function. This works by calling Symbolics.build_function,
+        # which creates a function as an Expr that evaluates build_function's first
+        # argument, with the next argument(s) as the function's input(s). If we
+        # set expression=Val{false}, build_function will return a compiled function
+        # as a RuntimeGeneratedFunction, which we do NOT want as this is not 
+        # GPU-compatible. Instead, we keep expression=Val{true} (technically this is
+        # the default) and we set new_func to be the evaluation of the returned Expr,
+        # which is now a callable function. This line is delicate--don't change unless
+        # you know what you're doing!
+        @eval new_func = $(build_function(cv_eqn, ordered_vars..., expression=Val{true}))
+    else
+        # Same as previous block, but without the speedup from a_cv + b_cv = (a+b)_cv
+        equation = 0 ~ term
+        step_1 = apply_transform(McCormickIntervalTransform(), [equation])
+        step_2 = shrink_eqs(step_1)
+        ordered_vars = pull_vars(step_2)
+        @eval new_func = $(build_function(step_2[3].rhs, ordered_vars..., expression=Val{true}))
+    end
     return new_func, ordered_vars
 end
 
-function convex_evaluator(term::Num)
-    # Same as the version with ::Equation as the input, but allows for
-    # more intuitive input. I.e., not making an equation where the LHS
-    # is meaningless. Since we need an equation to apply transforms,
-    # though, we just make an equation anyway (with a meaningless LHS)
-    equation = 0 ~ term
+function convex_evaluator(equation::Equation)
+    # Same as when the input is `Num`, but we have to deal with the input
+    # already being an equation (whose LHS is irrelevant)
+    if typeof(equation.rhs.val) <: SymbolicUtils.Add
+        cv_eqn = equation.rhs.val.coeff
+        for (key,val) in equation.rhs.val.dict
+            new_equation = 0 ~ (val*key)
+            step_1 = apply_transform(McCormickIntervalTransform(), [new_equation])
+            step_2 = shrink_eqs(step_1)
+            cv_eqn += step_2[3].rhs
+        end
+        ordered_vars = pull_vars(0~cv_eqn)
+        @eval new_func = $(build_function(cv_eqn, ordered_vars..., expression=Val{true}))
 
-    # And now everything is the same as the other version of this function
-    step_1 = apply_transform(McCormickIntervalTransform(), [equation])
-    step_2 = shrink_eqs(step_1)
-    ordered_vars = pull_vars(step_2)
-    @eval new_func = $(build_function(step_2[3].rhs, ordered_vars..., expression=Val{true}))
+    else
+        step_1 = apply_transform(McCormickIntervalTransform(), [equation])
+        step_2 = shrink_eqs(step_1)
+        ordered_vars = pull_vars(step_2)
+        @eval new_func = $(build_function(step_2[3].rhs, ordered_vars..., expression=Val{true}))
+    end
+
     return new_func, ordered_vars
 end
 
 """
-    all_evaluators(::Equation)
     all_evaluators(::Num)
+    all_evaluators(::Equation)
 
 See `convex_evaluator`. This function performs the same task, but returns
 four functions (representing lower bound, upper bound, convex relaxation,
 and concave relaxation evaluation functions) and the order vector.
 """
-function all_evaluators(equation::Equation)
-    step_1 = apply_transform(McCormickIntervalTransform(), [equation])
-    step_2 = shrink_eqs(step_1)
-    ordered_vars = pull_vars(step_2)
-    @eval lo_evaluator = $(build_function(step_2[1].rhs, ordered_vars..., expression=Val{true}))
-    @eval hi_evaluator = $(build_function(step_2[2].rhs, ordered_vars..., expression=Val{true}))
-    @eval cv_evaluator = $(build_function(step_2[3].rhs, ordered_vars..., expression=Val{true}))
-    @eval cc_evaluator = $(build_function(step_2[4].rhs, ordered_vars..., expression=Val{true}))
+function all_evaluators(term::Num)
+    if typeof(term.val) <: SymbolicUtils.Add
+        lo_eqn = term.val.coeff
+        hi_eqn = term.val.coeff
+        cv_eqn = term.val.coeff
+        cc_eqn = term.val.coeff
+        for (key,val) in term.val.dict
+            equation = 0 ~ (val*key)
+            step_1 = apply_transform(McCormickIntervalTransform(), [equation])
+            step_2 = shrink_eqs(step_1)
+            lo_eqn += step_2[1].rhs
+            hi_eqn += step_2[2].rhs
+            cv_eqn += step_2[3].rhs
+            cc_eqn += step_2[3].rhs
+        end
+        ordered_vars = pull_vars(step_2)
+        @eval lo_evaluator = $(build_function(lo_eqn, ordered_vars..., expression=Val{true}))
+        @eval hi_evaluator = $(build_function(hi_eqn, ordered_vars..., expression=Val{true}))
+        @eval cv_evaluator = $(build_function(cv_eqn, ordered_vars..., expression=Val{true}))
+        @eval cc_evaluator = $(build_function(cc_eqn, ordered_vars..., expression=Val{true}))
+    else
+        equation = 0 ~ term
+        step_1 = apply_transform(McCormickIntervalTransform(), [equation])
+        step_2 = shrink_eqs(step_1)
+        ordered_vars = pull_vars(step_2)
+        @eval lo_evaluator = $(build_function(step_2[1].rhs, ordered_vars..., expression=Val{true}))
+        @eval hi_evaluator = $(build_function(step_2[2].rhs, ordered_vars..., expression=Val{true}))
+        @eval cv_evaluator = $(build_function(step_2[3].rhs, ordered_vars..., expression=Val{true}))
+        @eval cc_evaluator = $(build_function(step_2[4].rhs, ordered_vars..., expression=Val{true}))
+    end
     return lo_evaluator, hi_evaluator, cv_evaluator, cc_evaluator, ordered_vars
 end
-function all_evaluators(term::Num)
-    equation = 0 ~ term
-    step_1 = apply_transform(McCormickIntervalTransform(), [equation])
-    step_2 = shrink_eqs(step_1)
-    ordered_vars = pull_vars(step_2)
-    @eval lo_evaluator = $(build_function(step_2[1].rhs, ordered_vars..., expression=Val{true}))
-    @eval hi_evaluator = $(build_function(step_2[2].rhs, ordered_vars..., expression=Val{true}))
-    @eval cv_evaluator = $(build_function(step_2[3].rhs, ordered_vars..., expression=Val{true}))
-    @eval cc_evaluator = $(build_function(step_2[4].rhs, ordered_vars..., expression=Val{true}))
+function all_evaluators(equation::Equation)
+    if typeof(equation.rhs.val) <: SymbolicUtils.Add
+        lo_eqn = equation.rhs.val.coeff
+        hi_eqn = equation.rhs.val.coeff
+        cv_eqn = equation.rhs.val.coeff
+        cc_eqn = equation.rhs.val.coeff
+        for (key,val) in equation.rhs.val.dict
+            new_equation = 0 ~ (val*key)
+            step_1 = apply_transform(McCormickIntervalTransform(), [new_equation])
+            step_2 = shrink_eqs(step_1)
+            lo_eqn += step_2[1].rhs
+            hi_eqn += step_2[2].rhs
+            cv_eqn += step_2[3].rhs
+            cc_eqn += step_2[3].rhs
+        end
+        ordered_vars = pull_vars(step_2)
+        @eval lo_evaluator = $(build_function(lo_eqn, ordered_vars..., expression=Val{true}))
+        @eval hi_evaluator = $(build_function(hi_eqn, ordered_vars..., expression=Val{true}))
+        @eval cv_evaluator = $(build_function(cv_eqn, ordered_vars..., expression=Val{true}))
+        @eval cc_evaluator = $(build_function(cc_eqn, ordered_vars..., expression=Val{true}))
+    else
+        step_1 = apply_transform(McCormickIntervalTransform(), [equation])
+        step_2 = shrink_eqs(step_1)
+        ordered_vars = pull_vars(step_2)
+        @eval lo_evaluator = $(build_function(step_2[1].rhs, ordered_vars..., expression=Val{true}))
+        @eval hi_evaluator = $(build_function(step_2[2].rhs, ordered_vars..., expression=Val{true}))
+        @eval cv_evaluator = $(build_function(step_2[3].rhs, ordered_vars..., expression=Val{true}))
+        @eval cc_evaluator = $(build_function(step_2[4].rhs, ordered_vars..., expression=Val{true}))
+    end
     return lo_evaluator, hi_evaluator, cv_evaluator, cc_evaluator, ordered_vars
 end

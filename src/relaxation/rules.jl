@@ -8,7 +8,7 @@
 
 function transform_rule(::McCormickIntervalTransform, rule::Any, yL, yU, ycv, ycc, xL, xU, xcv, xcc)
     rL, rU = transform_rule(IntervalTransform(), rule, yL, yU, xL, xU)
-    rcv, rcc = transform_rule(McCormickTransform(), rule, ycv, ycc, yL, yU, xcv, xcc, xL, xU)
+    rcv, rcc = transform_rule(McCormickTransform(), rule, yL, yU, ycv, ycc, xL, xU, xcv, xcc)
     return rL, rU, rcv, rcc
 end
 function transform_rule(::McCormickIntervalTransform, rule::Any, zL, zU, zcv, zcc, xL, xU, xcv, xcc, yL, yU, ycv, ycc)
@@ -47,6 +47,11 @@ end
 
 # Rules for multiplication adapted from:
 # https://github.com/PSORLab/McCormick.jl/blob/master/src/forward_operators/multiplication.jl
+function transform_rule(::McCormickTransform, ::typeof(*), zL, zU, zcv, zcc, xL, xU, xcv, xcc, yL::Real, yU::Real, ycv::Real, ycc::Real)
+    rcv = Equation(zcv, IfElse.ifelse(yL >= 0.0, ycv*xcv, ycc*xcc))
+    rcc = Equation(zcc, IfElse.ifelse(yL >= 0.0, ycc*xcc, ycv*xcv))
+    return rcv, rcc
+end
 function transform_rule(::McCormickTransform, ::typeof(*), zL, zU, zcv, zcc, xL, xU, xcv, xcc, yL, yU, ycv, ycc)
     rcv = Equation(zcv, IfElse.ifelse(xL >= 0.0,
         IfElse.ifelse(yL >= 0.0, max(yU*xcv + xU*ycv - xU*yU, yL*xcv + xL*ycv - xL*yL),

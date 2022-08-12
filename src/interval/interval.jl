@@ -40,6 +40,11 @@ function var_names(::IntervalTransform, s::Term{Real, Nothing}) #Any terms like 
             var_hi = genparam(Symbol(string(s.arguments[1].name)*"_"*string(s.arguments[2])*"_hi"))
         end
     else
+        println("Term: $s")
+        for arg in s.arguments
+            @show arg
+            @show typeof(arg)
+        end
         error("Type of argument invalid")
     end
 

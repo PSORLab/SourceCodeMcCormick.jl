@@ -35,6 +35,11 @@ function transform_rule(::IntervalTransform, ::typeof(-), zL, zU, xL, xU, yL, yU
     ru = Equation(zU, xU - yL)
     return rl, ru
 end
+function transform_rule(::IntervalTransform, ::typeof(*), zL, zU, xL, xU, yL::Real, yU::Real)
+    rl = Equation(zL, IfElse.ifelse(yL >= 0.0, yL*xL, yU*xU))
+    ru = Equation(zU, IfElse.ifelse(yL >= 0.0, yU*xU, yL*xL))
+    return rl, ru
+end
 function transform_rule(::IntervalTransform, ::typeof(*), zL, zU, xL, xU, yL, yU)
     rl = Equation(zL, IfElse.ifelse(yL >= 0.0, #x*pos
         IfElse.ifelse(xL >= 0.0, xL*yL, #pos*pos

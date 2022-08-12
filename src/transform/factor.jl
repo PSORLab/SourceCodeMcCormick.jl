@@ -1,7 +1,7 @@
 
 base_term(a::Any) = false
 base_term(a::Term{Real, Base.ImmutableDict{DataType,Any}}) = true
-base_term(a::Term{Real, Nothing}) = true
+base_term(a::Term{Real, Nothing}) = (a.f==getindex)
 base_term(a::Sym) = true
 base_term(a::Real) = true
 

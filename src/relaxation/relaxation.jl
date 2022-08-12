@@ -18,7 +18,7 @@ end
 function var_names(::McCormickTransform, s::Real)
     return s, s
 end
-function var_names(::McCormickTransform, s::Term{Real, Nothing}) #Any terms like "Differential"
+function var_names(::McCormickTransform, s::Term{Real, Nothing}) #Any terms like "Differential" or x[1]
     if typeof(s.arguments[1])<:Term #then it has args
         args = Symbol[]
         for i in s.arguments[1].arguments
