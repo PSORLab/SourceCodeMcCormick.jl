@@ -41,6 +41,23 @@ function isfactor(ex::Term{Real,Nothing})
     return true
 end
 
+function factor!(ex::Sym{Real, Base.ImmutableDict{DataType, Any}}; eqs = Equation[])
+    index = findall(x -> isequal(x.rhs,ex), eqs)
+    if isempty(index)
+        newsym = gensym(:aux)
+        newsym = Symbol(string(newsym)[3:5] * string(newsym)[7:end])
+        newvar = genvar(newsym)
+        new = Equation(Symbolics.value(newvar), ex)
+        push!(eqs, new)
+    else
+        p = collect(1:length(eqs))
+        deleteat!(p, index[1])
+        push!(p, index[1])
+        eqs[:] = eqs[p]
+    end
+    return eqs
+end
+
 function factor!(ex::SymbolicUtils.Add; eqs = Equation[])
     binarize!(ex)
     if isfactor(ex)

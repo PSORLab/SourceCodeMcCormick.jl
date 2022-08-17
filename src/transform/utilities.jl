@@ -2,6 +2,7 @@
 arity(a::Equation) = arity(a.rhs)
 arity(a::Term{Real, Base.ImmutableDict{DataType,Any}}) = 1
 arity(a::Term{Real, Nothing}) = 1
+arity(a::Sym{Real, Base.ImmutableDict{DataType,Any}}) = 1
 arity(a::SymbolicUtils.Add) = length(a.dict) + (~iszero(a.coeff))
 arity(a::SymbolicUtils.Mul) = length(a.dict) + (~isone(a.coeff))
 arity(a::SymbolicUtils.Pow) = 2
@@ -14,12 +15,14 @@ op(::SymbolicUtils.Pow) = ^
 op(::SymbolicUtils.Div) = /
 op(::Term{Real, Base.ImmutableDict{DataType,Any}}) = nothing
 op(a::Term{Real, Nothing}) = a.f
+op(a::Sym{Real, Base.ImmutableDict{DataType,Any}}) = getindex
 
 xstr(a::Equation) = sub_1(a.rhs)
 ystr(a::Equation) = sub_2(a.rhs)
 zstr(a::Equation) = a.lhs
 
 sub_1(a::Term{Real, Base.ImmutableDict{DataType,Any}}) = a
+sub_1(a::Sym{Real, Base.ImmutableDict{DataType,Any}}) = a
 function sub_1(a::SymbolicUtils.Add)
     sorted_dict = sort(collect(a.dict), by=x->string(x[1]))
     return sorted_dict[1].first
@@ -528,9 +531,9 @@ function all_evaluators(term::Num)
             lo_eqn += step_2[1].rhs
             hi_eqn += step_2[2].rhs
             cv_eqn += step_2[3].rhs
-            cc_eqn += step_2[3].rhs
+            cc_eqn += step_2[4].rhs
         end
-        ordered_vars = pull_vars(step_2)
+        ordered_vars = pull_vars(0 ~ cv_eqn)
         @eval lo_evaluator = $(build_function(lo_eqn, ordered_vars..., expression=Val{true}))
         @eval hi_evaluator = $(build_function(hi_eqn, ordered_vars..., expression=Val{true}))
         @eval cv_evaluator = $(build_function(cv_eqn, ordered_vars..., expression=Val{true}))
@@ -548,25 +551,30 @@ function all_evaluators(term::Num)
     return lo_evaluator, hi_evaluator, cv_evaluator, cc_evaluator, ordered_vars
 end
 function all_evaluators(equation::Equation)
-    if typeof(equation.rhs.val) <: SymbolicUtils.Add
-        lo_eqn = equation.rhs.val.coeff
-        hi_eqn = equation.rhs.val.coeff
-        cv_eqn = equation.rhs.val.coeff
-        cc_eqn = equation.rhs.val.coeff
-        for (key,val) in equation.rhs.val.dict
+    if typeof(equation.rhs) <: SymbolicUtils.Add
+        lo_eqn = equation.rhs.coeff
+        hi_eqn = equation.rhs.coeff
+        cv_eqn = equation.rhs.coeff
+        cc_eqn = equation.rhs.coeff
+        for (key,val) in equation.rhs.dict
             new_equation = 0 ~ (val*key)
             step_1 = apply_transform(McCormickIntervalTransform(), [new_equation])
             step_2 = shrink_eqs(step_1)
             lo_eqn += step_2[1].rhs
             hi_eqn += step_2[2].rhs
             cv_eqn += step_2[3].rhs
-            cc_eqn += step_2[3].rhs
+            cc_eqn += step_2[4].rhs
         end
-        ordered_vars = pull_vars(step_2)
+        ordered_vars = pull_vars(0 ~ cv_eqn)
         @eval lo_evaluator = $(build_function(lo_eqn, ordered_vars..., expression=Val{true}))
         @eval hi_evaluator = $(build_function(hi_eqn, ordered_vars..., expression=Val{true}))
         @eval cv_evaluator = $(build_function(cv_eqn, ordered_vars..., expression=Val{true}))
         @eval cc_evaluator = $(build_function(cc_eqn, ordered_vars..., expression=Val{true}))
+
+        @show length(string(lo_eqn))
+        @show length(string(hi_eqn))
+        @show length(string(cv_eqn))
+        @show length(string(cc_eqn))
     else
         step_1 = apply_transform(McCormickIntervalTransform(), [equation])
         step_2 = shrink_eqs(step_1)
@@ -575,6 +583,11 @@ function all_evaluators(equation::Equation)
         @eval hi_evaluator = $(build_function(step_2[2].rhs, ordered_vars..., expression=Val{true}))
         @eval cv_evaluator = $(build_function(step_2[3].rhs, ordered_vars..., expression=Val{true}))
         @eval cc_evaluator = $(build_function(step_2[4].rhs, ordered_vars..., expression=Val{true}))
+        
+        @show length(string(step_2[1].rhs))
+        @show length(string(step_2[2].rhs))
+        @show length(string(step_2[3].rhs))
+        @show length(string(step_2[4].rhs))
     end
     return lo_evaluator, hi_evaluator, cv_evaluator, cc_evaluator, ordered_vars
 end
