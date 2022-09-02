@@ -213,11 +213,13 @@ end
 
 
 """
-    pull_vars(eqn::Equation)
-    pull_vars(eqns::Vector{Equation})
+    pull_vars(::Num)
+    pull_vars(::Vector{Num})
+    pull_vars(::Equation)
+    pull_vars(::Vector{Equation})
 
-Pull out all variables/symbols from the RHS of an equation or set
-of equations and sorts them alphabetically. 
+Pull out all variables/symbols from an expression or the RHS of an
+equation (or RHSs of a set of equations), and sort them alphabetically.
 
 # Example
 
@@ -230,6 +232,24 @@ julia> pull_vars(func)
  z
 ```
 """
+function pull_vars(term::Num)
+    vars = Num[]
+    strings = String[]
+    vars, strings = _pull_vars(term, vars, strings)
+    vars = vars[sortperm(strings)]
+    return vars
+end
+
+function pull_vars(terms::Vector{Num})
+    vars = Num[]
+    strings = String[]
+    for term in terms
+        vars, strings = _pull_vars(term, vars, strings)
+    end
+    vars = vars[sortperm(strings)]
+    return vars
+end
+
 function pull_vars(eqn::Equation)
     vars = Num[]
     strings = String[]
@@ -463,7 +483,7 @@ function convex_evaluator(term::Num)
         end
 
         # Scan through the equation and pick out and organize all variables needed as inputs
-        ordered_vars = pull_vars(0 ~ cv_eqn)
+        ordered_vars = pull_vars(cv_eqn)
 
         # Create the evaluation function. This works by calling Symbolics.build_function,
         # which creates a function as an Expr that evaluates build_function's first
@@ -497,7 +517,7 @@ function convex_evaluator(equation::Equation)
             step_2 = shrink_eqs(step_1)
             cv_eqn += step_2[3].rhs
         end
-        ordered_vars = pull_vars(0~cv_eqn)
+        ordered_vars = pull_vars(cv_eqn)
         @eval new_func = $(build_function(cv_eqn, ordered_vars..., expression=Val{true}))
 
     else
@@ -533,7 +553,7 @@ function all_evaluators(term::Num)
             cv_eqn += step_2[3].rhs
             cc_eqn += step_2[4].rhs
         end
-        ordered_vars = pull_vars(0 ~ cv_eqn)
+        ordered_vars = pull_vars([0~lo_eqn, 0~hi_eqn, 0~cv_eqn, 0~cc_eqn])
         @eval lo_evaluator = $(build_function(lo_eqn, ordered_vars..., expression=Val{true}))
         @eval hi_evaluator = $(build_function(hi_eqn, ordered_vars..., expression=Val{true}))
         @eval cv_evaluator = $(build_function(cv_eqn, ordered_vars..., expression=Val{true}))
@@ -565,7 +585,7 @@ function all_evaluators(equation::Equation)
             cv_eqn += step_2[3].rhs
             cc_eqn += step_2[4].rhs
         end
-        ordered_vars = pull_vars(0 ~ cv_eqn)
+        ordered_vars = pull_vars([0~lo_eqn, 0~hi_eqn, 0~cv_eqn, 0~cc_eqn])
         @eval lo_evaluator = $(build_function(lo_eqn, ordered_vars..., expression=Val{true}))
         @eval hi_evaluator = $(build_function(hi_eqn, ordered_vars..., expression=Val{true}))
         @eval cv_evaluator = $(build_function(cv_eqn, ordered_vars..., expression=Val{true}))

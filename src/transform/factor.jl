@@ -41,6 +41,7 @@ function isfactor(ex::Term{Real,Nothing})
     return true
 end
 
+factor!(ex::Num) = factor!(ex.val)
 function factor!(ex::Sym{Real, Base.ImmutableDict{DataType, Any}}; eqs = Equation[])
     index = findall(x -> isequal(x.rhs,ex), eqs)
     if isempty(index)
