@@ -235,7 +235,7 @@ julia> pull_vars(func)
 function pull_vars(term::Num)
     vars = Num[]
     strings = String[]
-    vars, strings = _pull_vars(term, vars, strings)
+    vars, strings = _pull_vars(term.val, vars, strings)
     vars = vars[sortperm(strings)]
     return vars
 end
@@ -244,7 +244,7 @@ function pull_vars(terms::Vector{Num})
     vars = Num[]
     strings = String[]
     for term in terms
-        vars, strings = _pull_vars(term, vars, strings)
+        vars, strings = _pull_vars(term.val, vars, strings)
     end
     vars = vars[sortperm(strings)]
     return vars

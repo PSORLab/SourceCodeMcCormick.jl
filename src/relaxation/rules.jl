@@ -31,9 +31,10 @@ function transform_rule(::McCormickTransform, ::typeof(exp), yL, yU, ycv, ycc, x
     mcv = mid_expr(xcv, xcc, xL)
     mcc = mid_expr(xcv, xcc, xU)
     rcv = Equation(ycv, exp(mcv))
-    rcc = Equation(ycc, line_expr(mcc, xL, xU, yL, yU))
+    rcc = Equation(ycc, line_expr(mcc, xL, xU, exp(xL), exp(xU)))
     return rcv, rcc
 end
+
 
 #=
 Binary Rules
