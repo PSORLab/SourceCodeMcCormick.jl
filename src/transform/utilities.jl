@@ -483,7 +483,7 @@ function convex_evaluator(term::Num)
         end
 
         # Scan through the equation and pick out and organize all variables needed as inputs
-        ordered_vars = pull_vars(cv_eqn)
+        ordered_vars = pull_vars(Num(cv_eqn))
 
         # Create the evaluation function. This works by calling Symbolics.build_function,
         # which creates a function as an Expr that evaluates build_function's first
@@ -517,7 +517,7 @@ function convex_evaluator(equation::Equation)
             step_2 = shrink_eqs(step_1)
             cv_eqn += step_2[3].rhs
         end
-        ordered_vars = pull_vars(cv_eqn)
+        ordered_vars = pull_vars(Num(cv_eqn))
         @eval new_func = $(build_function(cv_eqn, ordered_vars..., expression=Val{true}))
 
     else
