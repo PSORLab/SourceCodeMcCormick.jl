@@ -113,4 +113,3 @@ function transform_rule(::IntervalTransform, ::typeof(^), zL, zU, xL, xU, yL, yU
     return rl, ru
 end
 
-# TODO: /, ^
