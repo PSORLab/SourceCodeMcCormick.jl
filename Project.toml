@@ -11,8 +11,8 @@ SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
 
 [compat]
 DocStringExtensions = "0.8 - 0.9"
-IfElse = "0.1.0"
 ModelingToolkit = "8"
+IfElse = "0.1.0 - 0.1.1"
 SymbolicUtils = "0.19.7"
 julia = "1.7"
 
