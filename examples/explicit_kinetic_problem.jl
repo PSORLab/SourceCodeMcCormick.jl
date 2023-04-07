@@ -9,9 +9,13 @@
 # Import the necessary packages
 using EAGO, JuMP, CSV, DataFrames, Symbolics, SourceCodeMcCormick, CUDA, BenchmarkTools
 
+# Import the ParBB algorithm
+include(joinpath(@__DIR__, "ParBB", "extension.jl"))
+include(joinpath(@__DIR__, "ParBB", "subroutines.jl"))
+
 # Import the kinetic intensity data
-data = CSV.read("C:/Users/rxg20001/Documents/Github_Repositories/EAGO-GPU.jl/kinetic_intensity_data.csv", DataFrame)
-bounds = CSV.read("C:/Users/rxg20001/Documents/Github_Repositories/EAGO-GPU.jl/implicit_variable_bounds.csv", DataFrame)
+data = CSV.read(joinpath(@__DIR__, "kinetic_intensity_data.csv"), DataFrame)
+bounds = CSV.read(joinpath(@__DIR__, "implicit_variable_bounds.csv"), DataFrame)
 
 # Define the constant terms in the expressions
 T = 273.0
