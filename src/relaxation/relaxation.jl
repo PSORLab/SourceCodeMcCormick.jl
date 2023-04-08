@@ -1,53 +1,38 @@
 struct McCormickTransform <: AbstractTransform end
 struct McCormickIntervalTransform <: AbstractTransform end
 
-function var_names(::McCormickTransform, s::Term{Real, Base.ImmutableDict{DataType, Any}})
-    arg_list = Symbol[]
-    if haskey(s.metadata, ModelingToolkit.MTKParameterCtx)
-        scv = genparam(Symbol(string(get_name(s))*"_cv"))
-        scc = genparam(Symbol(string(get_name(s))*"_cc"))
-    else
-        for i in s.arguments
-            push!(arg_list, get_name(i))
-        end
-        scv = genvar(Symbol(string(get_name(s))*"_cv"), arg_list)
-        scc = genvar(Symbol(string(get_name(s))*"_cc"), arg_list)
-    end
-    return Symbolics.value(scv), Symbolics.value(scc)
-end
-function var_names(::McCormickTransform, s::Real)
-    return s, s
-end
-function var_names(::McCormickTransform, s::Term{Real, Nothing}) #Any terms like "Differential" or x[1]
-    if typeof(s.arguments[1])<:Term #then it has args
-        args = Symbol[]
-        for i in s.arguments[1].arguments
-            push!(args, get_name(i))
-        end
-        var = get_name(s.arguments[1])
-        var_cv = genvar(Symbol(string(var)*"_cv"), args)
-        var_cc = genvar(Symbol(string(var)*"_cc"), args)
-    elseif typeof(s.arguments[1])<:Sym #Then it has no args
-        if length(s.arguments)==1
-            var_cv = genparam(Symbol(string(s.arguments[1].name)*"_cv"))
-            var_cc = genparam(Symbol(string(s.arguments[1].name)*"_cc"))
-        else
-            var_cv = genparam(Symbol(string(s.arguments[1].name)*"_"*string(s.arguments[2])*"_cv"))
-            var_cc = genparam(Symbol(string(s.arguments[1].name)*"_"*string(s.arguments[2])*"_cc"))
-        end
-    else
-        error("Type of argument invalid")
-    end
 
-    scv = s.f(var_cv)
-    scc = s.f(var_cc)
-    return Symbolics.value(scv), Symbolics.value(scc)
+var_names(::McCormickTransform, a::Real) = a, a
+function var_names(::McCormickTransform, a::BasicSymbolic)
+    if exprtype(a)==SYM
+        acv = genvar(Symbol(string(get_name(a))*"_cv"))
+        acc = genvar(Symbol(string(get_name(a))*"_cc"))
+        return acv.val, acc.val
+    elseif exprtype(a)==TERM
+        if varterm(a)
+            arg_list = Symbol[]
+            for i in a.arguments
+                push!(arg_list, get_name(i))
+            end
+            acv = genvar(Symbol(string(get_name(a))*"_cv"), arg_list)
+            acc = genvar(Symbol(string(get_name(a))*"_cc"), arg_list)
+            return acv.val, acc.val
+        else
+            acv = genvar(Symbol(string(get_name(a))*"_cv"))
+            acc = genvar(Symbol(string(get_name(a))*"_cc"))
+            return acv.val, acc.val
+        end
+    else
+        error("Reached `var_names` with an unexpected type [ADD/MUL/DIV/POW]. Check expression factorization to make sure it is being binarized correctly.")
+    end
 end
-function var_names(::McCormickTransform, s::Sym) #The parameters
-    scv = genparam(Symbol(string(get_name(s))*"_cv"))
-    scc = genparam(Symbol(string(get_name(s))*"_cc"))
-    return Symbolics.value(scv), Symbolics.value(scc)
+
+function var_names(::McCormickIntervalTransform, a::Any)
+    aL, aU = var_names(IntervalTransform(), a)
+    acv, acc = var_names(McCormickTransform(), a)
+    return aL, aU, acv, acc
 end
+
 
 function translate_initial_conditions(::McCormickTransform, prob::ODESystem, new_eqs::Vector{Equation})
     vars, params = extract_terms(new_eqs)
@@ -70,14 +55,6 @@ function translate_initial_conditions(::McCormickTransform, prob::ODESystem, new
     end
     return var_defaults, param_defaults
 end
-
-
-function var_names(::McCormickIntervalTransform, s::Any)
-    sL, sU = var_names(IntervalTransform(), s)
-    scv, scc = var_names(McCormickTransform(), s)
-    return sL, sU, scv, scc
-end
-
 
 function translate_initial_conditions(::McCormickIntervalTransform, prob::ODESystem, new_eqs::Vector{Equation})
     vars, params = extract_terms(new_eqs)

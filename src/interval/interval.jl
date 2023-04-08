@@ -5,57 +5,29 @@ Rules for constructing interval bounding expressions
 # Structure used to indicate an overload with intervals is preferable
 struct IntervalTransform <: AbstractTransform end
 
-function var_names(::IntervalTransform, s::Term{Real, Base.ImmutableDict{DataType, Any}}) #The variables
-    arg_list = Symbol[]
-    if haskey(s.metadata, ModelingToolkit.MTKParameterCtx)
-        sL = genparam(Symbol(string(get_name(s))*"_lo"))
-        sU = genparam(Symbol(string(get_name(s))*"_hi"))
-    else
-        for i in s.arguments
-            push!(arg_list, get_name(i))
-        end
-        sL = genvar(Symbol(string(get_name(s))*"_lo"), arg_list)
-        sU = genvar(Symbol(string(get_name(s))*"_hi"), arg_list)
-    end
-    return Symbolics.value(sL), Symbolics.value(sU)
-end
-function var_names(::IntervalTransform, s::Real)
-    return s, s
-end
-function var_names(::IntervalTransform, s::Term{Real, Nothing}) #Any terms like "Differential", or "x[1]" (NOT x[1](t))
-    if typeof(s.arguments[1])<:Term #then it has typical args like "x", "y", ...
-        args = Symbol[]
-        for i in s.arguments[1].arguments
-            push!(args, get_name(i))
-        end
-        var = get_name(s.arguments[1])
-        var_lo = genvar(Symbol(string(var)*"_lo"), args)
-        var_hi = genvar(Symbol(string(var)*"_hi"), args)
-    elseif typeof(s.arguments[1])<:Sym #Then it has no typical args, i.e., x[1] has args Any[x, 1]
-        if length(s.arguments)==1
-            var_lo = genparam(Symbol(string(s.arguments[1].name)*"_lo"))
-            var_hi = genparam(Symbol(string(s.arguments[1].name)*"_hi"))
+var_names(::IntervalTransform, a::Real) = a, a
+function var_names(::IntervalTransform, a::BasicSymbolic)
+    if exprtype(a)==SYM
+        aL = genvar(Symbol(string(get_name(a))*"_lo"))
+        aU = genvar(Symbol(string(get_name(a))*"_hi"))
+        return aL.val, aU.val
+    elseif exprtype(a)==TERM
+        if varterm(a)
+            arg_list = Symbol[]
+            for i in a.arguments
+                push!(arg_list, get_name(i))
+            end
+            aL = genvar(Symbol(string(get_name(a))*"_lo"), arg_list)
+            aU = genvar(Symbol(string(get_name(a))*"_hi"), arg_list)
+            return aL.val, aU.val
         else
-            var_lo = genparam(Symbol(string(s.arguments[1].name)*"_"*string(s.arguments[2])*"_lo"))
-            var_hi = genparam(Symbol(string(s.arguments[1].name)*"_"*string(s.arguments[2])*"_hi"))
+            aL = genvar(Symbol(string(get_name(a))*"_lo"))
+            aU = genvar(Symbol(string(get_name(a))*"_hi"))
+            return aL.val, aU.val
         end
     else
-        println("Term: $s")
-        for arg in s.arguments
-            @show arg
-            @show typeof(arg)
-        end
-        error("Type of argument invalid")
+        error("Reached `var_names` with an unexpected type [ADD/MUL/DIV/POW]. Check expression factorization to make sure it is being binarized correctly.")
     end
-
-    sL = s.f(var_lo)
-    sU = s.f(var_hi)
-    return Symbolics.value(sL), Symbolics.value(sU)
-end
-function var_names(::IntervalTransform, s::Sym) #The parameters
-    sL = genparam(Symbol(string(get_name(s))*"_lo"))
-    sU = genparam(Symbol(string(get_name(s))*"_hi"))
-    return Symbolics.value(sL), Symbolics.value(sU)
 end
 
 function translate_initial_conditions(::IntervalTransform, prob::ODESystem, new_eqs::Vector{Equation})
@@ -81,37 +53,28 @@ function translate_initial_conditions(::IntervalTransform, prob::ODESystem, new_
 end
 
 
-# Helper functions for navigating SymbolicUtils structures
-get_name(x::Sym{SymbolicUtils.FnType{Tuple{Any}, Real}, Nothing}) = x.name
-
 """
     get_name
 
-Take a Symbolic-type object such as `x[1,1]` and return a symbol like `:x_1_1`.
+Take a `BasicSymbolic` object such as `x[1,1]` and return a symbol like `:x_1_1`.
 """
-function get_name(s::Term{SymbolicUtils.FnType{Tuple, Real}, Nothing})
-    d = s.arguments
-    new_var = string(d[1])
-    for i in 2:length(d)
-        new_var = new_var*"_"*string(d[i])
-    end
-    return Symbol(new_var)
-end
-
-function get_name(s::Term)
-    if haskey(s.metadata, ModelingToolkit.MTKParameterCtx)
-        d = s.arguments
-        new_param = string(d[1])
-        for i in 2:length(d)
-            new_param = new_param*"_"*string(d[i])
+function get_name(a::BasicSymbolic)
+    if exprtype(a)==SYM
+        return a.name
+    elseif exprtype(a)==TERM
+        if varterm(a)
+            return a.f.name
+        elseif (a.f==getindex)
+            args = a.arguments
+            new_var = string(args[1])
+            for i in 2:lastindex(args)
+                new_var = new_var * "_" * string(args[i])
+            end
+            return Symbol(new_var)
+        else
+            error("Problem generating variable name. This may happen if the variable is non-standard. Please post an issue if you get this error.")
         end
-        return Symbol(new_param)
-    else
-        return get_name(s.f)
     end
-end
-function get_name(s::Sym)
-    return s.name
 end
 
 include(joinpath(@__DIR__, "rules.jl"))

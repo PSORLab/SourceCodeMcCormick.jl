@@ -6,6 +6,8 @@ using SymbolicUtils.Code
 using IfElse
 using DocStringExtensions
 
+import SymbolicUtils: BasicSymbolic, exprtype, SYM, TERM, ADD, MUL, POW, DIV
+
 """
     AbstractTransform
 
@@ -45,6 +47,6 @@ include(joinpath(@__DIR__, "transform", "transform.jl"))
 export McCormickIntervalTransform, IntervalTransform
 
 export apply_transform, all_evaluators, convex_evaluator, extract_terms, 
-        genvar, genparam, get_name, factor!, binarize!, pull_vars, shrink_eqs
+        genvar, genparam, get_name, factor, binarize!, pull_vars, shrink_eqs
         
 end

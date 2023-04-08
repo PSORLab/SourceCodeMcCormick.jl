@@ -1,74 +1,79 @@
 
+# Initial feed functions
 arity(a::Equation) = arity(a.rhs)
-arity(a::Term{Real, Base.ImmutableDict{DataType,Any}}) = 1
-arity(a::Term{Real, Nothing}) = 1
-arity(a::Sym{Real, Base.ImmutableDict{DataType,Any}}) = 1
-arity(a::SymbolicUtils.Add) = length(a.dict) + (~iszero(a.coeff))
-arity(a::SymbolicUtils.Mul) = length(a.dict) + (~isone(a.coeff))
-arity(a::SymbolicUtils.Pow) = 2
-arity(a::SymbolicUtils.Div) = 2
-
+arity(a::Num) = arity(a.val)
 op(a::Equation) = op(a.rhs)
-op(::SymbolicUtils.Add) = +
-op(::SymbolicUtils.Mul) = *
-op(::SymbolicUtils.Pow) = ^
-op(::SymbolicUtils.Div) = /
-op(::Term{Real, Base.ImmutableDict{DataType,Any}}) = nothing
-op(a::Term{Real, Nothing}) = a.f
-op(a::Sym{Real, Base.ImmutableDict{DataType,Any}}) = getindex
+op(a::Num) = op(a.val)
 
+# Helpful classification checker to differentiate between terms like
+# "exp(x)" where x is a variable, and terms like "y(t)" where y and t
+# are both variables
+varterm(a::BasicSymbolic) = typeof(a.f)<:BasicSymbolic ? true : false
+
+# Informational functions
+function arity(a::BasicSymbolic)
+    exprtype(a)==SYM  && return 1
+    exprtype(a)==TERM && return 1
+    exprtype(a)==ADD  && return length(a.dict) + (~iszero(a.coeff))
+    exprtype(a)==MUL  && return length(a.dict) + (~isone(a.coeff))
+    exprtype(a)==POW  && return 2
+    exprtype(a)==DIV  && return 2
+end
+function op(a::BasicSymbolic)
+    exprtype(a)==SYM  && return nothing
+    exprtype(a)==TERM && return varterm(a) ? nothing : a.f
+    exprtype(a)==ADD  && return +
+    exprtype(a)==MUL  && return *
+    exprtype(a)==POW  && return ^
+    exprtype(a)==DIV  && return /
+end
+
+# Component extraction functions
 xstr(a::Equation) = sub_1(a.rhs)
 ystr(a::Equation) = sub_2(a.rhs)
 zstr(a::Equation) = a.lhs
 
-sub_1(a::Term{Real, Base.ImmutableDict{DataType,Any}}) = a
-sub_1(a::Sym{Real, Base.ImmutableDict{DataType,Any}}) = a
-function sub_1(a::SymbolicUtils.Add)
-    sorted_dict = sort(collect(a.dict), by=x->string(x[1]))
-    return sorted_dict[1].first
-end
-function sub_2(a::SymbolicUtils.Add)
-    ~(iszero(a.coeff)) && return a.coeff
-    sorted_dict = sort(collect(a.dict), by=x->string(x[1]))
-    return sorted_dict[2].first
-end
-
-function sub_1(a::SymbolicUtils.Mul)
-    sorted_dict = sort(collect(a.dict), by=x->string(x[1]))
-    return sorted_dict[1].first
-end
-function sub_2(a::SymbolicUtils.Mul)
-    ~(isone(a.coeff)) && return a.coeff
-    sorted_dict = sort(collect(a.dict), by=x->string(x[1]))
-    return sorted_dict[2].first
-end
-function sub_1(a::SymbolicUtils.Div)
-    return a.num
-end
-function sub_2(a::SymbolicUtils.Div)
-    return a.den
-end
-function sub_1(a::SymbolicUtils.Pow)
-    return a.base
-end
-function sub_2(a::SymbolicUtils.Pow)
-    return a.exp
-end
-
-function sub_1(a::Term{Real, Nothing})
-    if a.f==getindex
+function sub_1(a::BasicSymbolic)
+    if exprtype(a)==SYM
         return a
-    else
+    elseif exprtype(a)==TERM
+        varterm(a) || a.f==getindex && return a
         return a.arguments[1]
+    elseif exprtype(a)==ADD
+        sorted_dict = sort(collect(a.dict), by=x->string(x[1]))
+        return sorted_dict[1].first
+    elseif exprtype(a)==MUL
+        sorted_dict = sort(collect(a.dict), by=x->string(x[1]))
+        return sorted_dict[1].first
+    elseif exprtype(a)==DIV
+        return a.num
+    elseif exprtype(a)==POW
+        return a.base
     end
 end
-sub_2(a::Term{Real, Nothing}) = a.arguments[2]
-
-
-# Uses Symbolics functions to generate a variable as a function of the dependent variables of choice (default: t)
-function genvar(a::Symbol)
-    @isdefined(t) ? genvar(a, :t) : genparam(a)
+function sub_2(a::BasicSymbolic)
+    if exprtype(a)==SYM
+        return nothing
+    elseif exprtype(a)==TERM
+        varterm(a) || a.f==getindex && return nothing
+        return a.arguments[2]
+    elseif exprtype(a)==ADD
+        ~(iszero(a.coeff)) && return a.coeff
+        sorted_dict = sort(collect(a.dict), by=x->string(x[1]))
+        return sorted_dict[2].first
+    elseif exprtype(a)==MUL
+        ~(isone(a.coeff)) && return a.coeff
+        sorted_dict = sort(collect(a.dict), by=x->string(x[1]))
+        return sorted_dict[2].first
+    elseif exprtype(a)==DIV
+        return a.den
+    elseif exprtype(a)==POW
+        return a.exp
+    end
 end
+
+
+# Uses Symbolics functions to generate a variable as a function of the dependent variables of choice 
 function genvar(a::Symbol, b::Symbol)
     vars = Symbol[]
     ex = Expr(:block)
@@ -89,6 +94,9 @@ function genvar(a::Symbol, b::Vector{Symbol})
     push!(ex.args, rhs)
     eval(ex)[1]
 end
+
+# If no variables are given, instead create a parameter
+genvar(a::Symbol) = genparam(a)
 function genparam(a::Symbol)
     params = Symbol[]
     ex = Expr(:block)
@@ -101,6 +109,7 @@ function genparam(a::Symbol)
 end
 
 
+# A function to extract terms from a set of equations, for use in dynamic systems
 function extract_terms(eqs::Vector{Equation})
     allstates = SymbolicUtils.OrderedSet()
     ps = SymbolicUtils.OrderedSet()
@@ -204,14 +213,6 @@ function get_cvcc_start_dict(sys::ODESystem, term::Num, start_point::Float64)
 end
 
 
-# Side note: this is how you can get a and b to show up NOT as a(t) and b(t)
-# t = genparam(:t)
-# a = genvar(:a)
-# b = genvar(:b)
-# st = SymbolicUtils.Code.NameState(Dict(a => :a, b => :b))
-# toexpr(a+b, st)
-
-
 """
     pull_vars(::Num)
     pull_vars(::Vector{Num})
@@ -268,15 +269,32 @@ function pull_vars(eqns::Vector{Equation})
     return vars
 end
 
-function _pull_vars(term::SymbolicUtils.Add, vars::Vector{Num}, strings::Vector{String})
+function _pull_vars(term::BasicSymbolic, vars::Vector{Num}, strings::Vector{String})
+    if exprtype(term)==SYM
+        if ~(string(term) in strings)
+            push!(strings, string(term))
+            push!(vars, term)
+            return vars, strings
+        end
+        return vars, strings
+    end
+    if exprtype(term)==TERM && varterm(term)
+        if ~(string(term.f) in strings)
+            push!(strings, string(term.f))
+            push!(vars, term)
+            return vars, strings
+        end
+        return vars, strings
+    end
     args = arguments(term)
     for arg in args
-        if (typeof(arg) <: Sym{Real, Base.ImmutableDict{DataType, Any}})
+        ~(typeof(arg)<:BasicSymbolic) ? continue : nothing
+        if exprtype(arg)==SYM
             if ~(string(arg) in strings)
                 push!(strings, string(arg))
                 push!(vars, arg)
             end
-        elseif (typeof(arg) <: Int) || (typeof(arg) <: AbstractFloat)
+        elseif typeof(arg) <: Real
             nothing
         else
             vars, strings = _pull_vars(arg, vars, strings)
@@ -285,97 +303,6 @@ function _pull_vars(term::SymbolicUtils.Add, vars::Vector{Num}, strings::Vector{
     return vars, strings
 end
 
-function _pull_vars(term::SymbolicUtils.Mul, vars::Vector{Num}, strings::Vector{String})
-    args = arguments(term)
-    for arg in args
-        if (typeof(arg) <: Sym{Real, Base.ImmutableDict{DataType, Any}})
-            if ~(string(arg) in strings)
-                push!(strings, string(arg))
-                push!(vars, arg)
-            end
-        elseif (typeof(arg) <: Int) || (typeof(arg) <: AbstractFloat)
-            nothing
-        else
-            vars, strings = _pull_vars(arg, vars, strings)
-        end
-    end
-    return vars, strings
-end
-
-function _pull_vars(term::SymbolicUtils.Div, vars::Vector{Num}, strings::Vector{String})
-    args = arguments(term)
-    for arg in args
-        if (typeof(arg) <: Sym{Real, Base.ImmutableDict{DataType, Any}})
-            if ~(string(arg) in strings)
-                push!(strings, string(arg))
-                push!(vars, arg)
-            end
-        elseif (typeof(arg) <: Int) || (typeof(arg) <: AbstractFloat)
-            nothing
-        else
-            vars, strings = _pull_vars(arg, vars, strings)
-        end
-    end
-    return vars, strings
-end
-
-function _pull_vars(term::SymbolicUtils.Pow, vars::Vector{Num}, strings::Vector{String})
-    args = arguments(term)
-    for arg in args
-        if (typeof(arg) <: Sym{Real, Base.ImmutableDict{DataType, Any}})
-            if ~(string(arg) in strings)
-                push!(strings, string(arg))
-                push!(vars, arg)
-            end
-        elseif (typeof(arg) <: Int) || (typeof(arg) <: AbstractFloat)
-            nothing
-        else
-            vars, strings = _pull_vars(arg, vars, strings)
-        end
-    end
-    return vars, strings
-end
-
-function _pull_vars(term::SymbolicUtils.Term{Real, Nothing}, vars::Vector{Num}, strings::Vector{String})
-    args = arguments(term)
-    for arg in args
-        if (typeof(arg) <: Sym{Real, Base.ImmutableDict{DataType, Any}})
-            if ~(string(arg) in strings)
-                push!(strings, string(arg))
-                push!(vars, arg)
-            end
-        elseif (typeof(arg) <: Int) || (typeof(arg) <: AbstractFloat)
-            nothing
-        else
-            vars, strings = _pull_vars(arg, vars, strings)
-        end
-    end
-    return vars, strings
-end
-
-function _pull_vars(term::SymbolicUtils.Term{Bool, Nothing}, vars::Vector{Num}, strings::Vector{String})
-    args = arguments(term)
-    for arg in args
-        if (typeof(arg) <: Sym{Real, Base.ImmutableDict{DataType, Any}})
-            if ~(string(arg) in strings)
-                push!(strings, string(arg))
-                push!(vars, arg)
-            end
-        elseif (typeof(arg) <: Int) || (typeof(arg) <: AbstractFloat)
-            nothing
-        else
-            vars, strings = _pull_vars(arg, vars, strings)
-        end
-    end
-    return vars, strings
-end
-
-function _pull_vars(term::SymbolicUtils.Term{Float64, Nothing}, vars::Vector{Num}, strings::Vector{String})
-    return vars, strings
-end
-function _pull_vars(term::Rational{Int64}, vars::Vector{Num}, strings::Vector{String})
-    return vars, strings
-end
 
 """
     shrink_eqs(::Vector{Equation})
@@ -475,7 +402,7 @@ function convex_evaluator(term::Num; force::Bool=false)
     # huge time savings by separating out the expression using the knowledge
     # that the sum of convex relaxations is equal to the convex relaxation
     # of the sum (i.e., a_cv + b_cv = (a+b)_cv, and same for lo/hi/cc)
-    if typeof(term.val) <: SymbolicUtils.Add
+    if exprtype(term.val) == ADD
         # Start with any real-valued operands [if present]
         cv_eqn = term.val.coeff
 
@@ -532,7 +459,7 @@ end
 function convex_evaluator(equation::Equation; force::Bool=false)
     # Same as when the input is `Num`, but we have to deal with the input
     # already being an equation (whose LHS is irrelevant)
-    if typeof(equation.rhs.val) <: SymbolicUtils.Add
+    if exprtype(equation.rhs.val) == ADD
         cv_eqn = equation.rhs.val.coeff
         for (key,val) in equation.rhs.val.dict
             new_equation = 0 ~ (val*key)
@@ -568,7 +495,7 @@ four functions (representing lower bound, upper bound, convex relaxation,
 and concave relaxation evaluation functions) [lo, hi, cv, cc] and the order vector.
 """
 function all_evaluators(term::Num; force::Bool=false)
-    if typeof(term.val) <: SymbolicUtils.Add
+    if exprtype(term.val) == ADD
         lo_eqn = term.val.coeff
         hi_eqn = term.val.coeff
         cv_eqn = term.val.coeff
@@ -606,7 +533,7 @@ function all_evaluators(term::Num; force::Bool=false)
     return lo_evaluator, hi_evaluator, cv_evaluator, cc_evaluator, ordered_vars
 end
 function all_evaluators(equation::Equation; force::Bool=false)
-    if typeof(equation.rhs) <: SymbolicUtils.Add
+    if exprtype(equation.rhs) == ADD
         lo_eqn = equation.rhs.coeff
         hi_eqn = equation.rhs.coeff
         cv_eqn = equation.rhs.coeff
