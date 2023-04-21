@@ -7,7 +7,7 @@
 #############################################################################
 
 # Import the necessary packages
-using EAGO, JuMP, CSV, DataFrames, Symbolics, SourceCodeMcCormick, CUDA, BenchmarkTools
+using EAGO, JuMP, CSV, DataFrames, Symbolics, SourceCodeMcCormick, CUDA
 
 # Import the ParBB algorithm
 include(joinpath(@__DIR__, "ParBB", "extension.jl"))
@@ -255,15 +255,3 @@ JuMP.register(m, :fobj, 3, fobj, autodiff=true)
 @NLobjective(m, Min, fobj(p...))
 
 optimize!(m)
-
-# Save the results
-open("C:/Users/rxg20001/Documents/Research Files/2023-03-25 Kinetic Problem SCMC GPU.txt","a") do io
-    println(io, "SCMC; GPU; Alpha=2e-5; 50k nodes per batch")
-    println(io, "Semi-parallelized lvb/uvb loading")
-    println(io, "Node count, Global Lower Bound, Global Upper Bound, Time (s)")
-    log = m.moi_backend.optimizer.model._global_optimizer._log
-    loglen = length(log.global_lower_bound)
-    for i = 1:loglen
-        println(io, string(log.node_count[i]), ",", string(log.global_lower_bound[i]), ",", string(log.global_upper_bound[i]), ",", string(log.run_time[i]))
-    end
-end
