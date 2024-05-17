@@ -3,7 +3,7 @@ include(joinpath(@__DIR__, "binarize.jl"))
 include(joinpath(@__DIR__, "factor.jl"))
 
 
-function apply_transform(transform::T, prob::ODESystem) where T<:AbstractTransform
+function apply_transform(transform::T, prob::ODESystem; constants::Vector{Num}=Num[]) where T<:AbstractTransform
 
     # Factorize all model equations to generate a new set of equations
 
@@ -26,11 +26,20 @@ function apply_transform(transform::T, prob::ODESystem) where T<:AbstractTransfo
     new_equations = Equation[]
     for a in equations
         zn = var_names(transform, zstr(a))
-        xn = var_names(transform, xstr(a))
+        if string(xstr(a)) in string.(constants)
+            xn = (xstr(a), xstr(a), xstr(a), xstr(a))
+        else
+            xn = var_names(transform, xstr(a))
+        end
         if isone(arity(a)) 
             targs = (transform, op(a), zn..., xn...)
-         else
-            targs = (transform, op(a), zn..., xn..., var_names(transform, ystr(a))...)
+        else
+            if string(ystr(a)) in string.(constants)
+                yn = (ystr(a), ystr(a), ystr(a), ystr(a))
+            else
+                yn = var_names(transform, ystr(a))
+            end
+            targs = (transform, op(a), zn..., xn..., yn...)
         end
         new = transform_rule(targs...)
         for i in new
@@ -47,7 +56,7 @@ function apply_transform(transform::T, prob::ODESystem) where T<:AbstractTransfo
     return new_sys
 end
 
-function apply_transform(transform::T, eqn_vector::Vector{Equation}) where T<:AbstractTransform
+function apply_transform(transform::T, eqn_vector::Vector{Equation}; constants::Vector{Num}=Num[]) where T<:AbstractTransform
 
     # Factorize all model equations to generate a new set of equations
     equations = Equation[]
@@ -64,14 +73,28 @@ function apply_transform(transform::T, eqn_vector::Vector{Equation}) where T<:Ab
     end
 
     # Apply transform rules to the factored equations to make the final equation set
+    # NOTE: Unlike the ordering of [cv,cc,L,U] used in other parts of the code, the
+    #       ordering used by transformations is [L,U,cv,cc]. This is because convex
+    #       and concave relaxations may occasionally need previously calculated lower
+    #       and upper bounds, and it is more convenient to list the interval extension
+    #       first so that the substitution step can proceed without backtracking.
     new_equations = Equation[]
     for a in equations
         zn = var_names(transform, zstr(a))
-        xn = var_names(transform, xstr(a))
+        if string(xstr(a)) in string.(constants)
+            xn = (xstr(a), xstr(a), xstr(a), xstr(a))
+        else
+            xn = var_names(transform, xstr(a))
+        end
         if isone(arity(a)) 
             targs = (transform, op(a), zn..., xn...)
-         else
-            targs = (transform, op(a), zn..., xn..., var_names(transform, ystr(a))...)
+        else
+            if string(ystr(a)) in string.(constants)
+                yn = (ystr(a), ystr(a), ystr(a), ystr(a))
+            else
+                yn = var_names(transform, ystr(a))
+            end
+            targs = (transform, op(a), zn..., xn..., yn...)
         end
         new = transform_rule(targs...)
         for i in new
@@ -82,7 +105,7 @@ function apply_transform(transform::T, eqn_vector::Vector{Equation}) where T<:Ab
     return new_equations
 end
 
-function apply_transform(transform::T, eqn::Equation) where T<:AbstractTransform
+function apply_transform(transform::T, eqn::Equation; constants::Vector{Num}=Num[]) where T<:AbstractTransform
 
     # Factorize the equations to generate a new set of equations
     equations = Equation[]
@@ -99,11 +122,20 @@ function apply_transform(transform::T, eqn::Equation) where T<:AbstractTransform
     new_equations = Equation[]
     for a in equations
         zn = var_names(transform, zstr(a))
-        xn = var_names(transform, xstr(a))
+        if string(xstr(a)) in string.(constants)
+            xn = (xstr(a), xstr(a), xstr(a), xstr(a))
+        else
+            xn = var_names(transform, xstr(a))
+        end
         if isone(arity(a)) 
             targs = (transform, op(a), zn..., xn...)
-         else
-            targs = (transform, op(a), zn..., xn..., var_names(transform, ystr(a))...)
+        else
+            if string(ystr(a)) in string.(constants)
+                yn = (ystr(a), ystr(a), ystr(a), ystr(a))
+            else
+                yn = var_names(transform, ystr(a))
+            end
+            targs = (transform, op(a), zn..., xn..., yn...)
         end
         new = transform_rule(targs...)
         for i in new
@@ -114,7 +146,7 @@ function apply_transform(transform::T, eqn::Equation) where T<:AbstractTransform
     return new_equations
 end
 
-function apply_transform(transform::T, num::Num) where T<:AbstractTransform
+function apply_transform(transform::T, num::Num; constants::Vector{Num}=Num[]) where T<:AbstractTransform
 
     # Factorize the equations to generate a new set of equations
     @variables result
@@ -133,11 +165,20 @@ function apply_transform(transform::T, num::Num) where T<:AbstractTransform
     new_equations = Equation[]
     for a in equations
         zn = var_names(transform, zstr(a))
-        xn = var_names(transform, xstr(a))
+        if string(xstr(a)) in string.(constants)
+            xn = (xstr(a), xstr(a), xstr(a), xstr(a))
+        else
+            xn = var_names(transform, xstr(a))
+        end
         if isone(arity(a)) 
             targs = (transform, op(a), zn..., xn...)
-         else
-            targs = (transform, op(a), zn..., xn..., var_names(transform, ystr(a))...)
+        else
+            if string(ystr(a)) in string.(constants)
+                yn = (ystr(a), ystr(a), ystr(a), ystr(a))
+            else
+                yn = var_names(transform, ystr(a))
+            end
+            targs = (transform, op(a), zn..., xn..., yn...)
         end
         new = transform_rule(targs...)
         for i in new

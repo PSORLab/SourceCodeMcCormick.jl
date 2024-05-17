@@ -50,6 +50,14 @@ function solve_gpu!(m::EAGO.GlobalOptimizer)
     # Run branch and bound; terminate when the stack is empty or when some
     # tolerance or limit is hit
     while !EAGO.termination_check(m)
+        
+        # Garbage collect every 1000 iterations
+        if mod(m._iteration_count, 1000)==0
+            GC.enable(true)
+            GC.gc(false)
+            GC.enable(false)
+        end
+
         # Fathoming step
         EAGO.fathom!(m)
 
@@ -197,7 +205,7 @@ add_to_substack!(m::EAGO.GlobalOptimizer{R,S,Q}) where {R,S,Q<:EAGO.ExtensionTyp
 
 # Solve the lower and upper problem for all nodes simultaneously, using the convex_func
 # function from the ExtendGPU extension
-function lower_and_upper_problem!(t::ExtendGPU, m::EAGO.GlobalOptimizer)
+function lower_and_upper_problem!(t::PointwiseGPU, m::EAGO.GlobalOptimizer)
     # Step 1) Bring the bounds into the GPU
     lvbs_d = CuArray(t.all_lvbs) 
     uvbs_d = CuArray(t.all_uvbs) # [points x num_vars]
@@ -208,8 +216,8 @@ function lower_and_upper_problem!(t::ExtendGPU, m::EAGO.GlobalOptimizer)
     eval_points = Vector{CuArray{Float64}}(undef, 3*w)
     for i = 1:w
         eval_points[3i-2] = CuArray{Float64}(undef, l*np)
-        eval_points[3i-1] = repeat(uvbs_d[:,i], inner=np)
-        eval_points[3i] = repeat(lvbs_d[:,i], inner=np)
+        eval_points[3i-1] = repeat(lvbs_d[:,i], inner=np)
+        eval_points[3i] = repeat(uvbs_d[:,i], inner=np)
     end
     evals_d = CuArray{Float64}(undef, l*np)
     results_d = CuArray{Float64}(undef, l)

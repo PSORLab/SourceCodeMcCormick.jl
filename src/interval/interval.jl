@@ -12,7 +12,7 @@ function var_names(::IntervalTransform, a::BasicSymbolic)
         aU = genvar(Symbol(string(get_name(a))*"_hi"))
         return aL.val, aU.val
     elseif exprtype(a)==TERM
-        if varterm(a)
+        if varterm(a) && typeof(a.f)<:BasicSymbolic
             arg_list = Symbol[]
             for i in a.arguments
                 push!(arg_list, get_name(i))
@@ -56,25 +56,29 @@ end
 """
     get_name
 
-Take a `BasicSymbolic` object such as `x[1,1]` and return a symbol like `:x_1_1`.
+Take a `BasicSymbolic` object such as `x[1,1]` and return a symbol like `:xv1v1`.
 """
 function get_name(a::BasicSymbolic)
     if exprtype(a)==SYM
         return a.name
     elseif exprtype(a)==TERM
         if varterm(a)
-            return a.f.name
-        elseif (a.f==getindex)
-            args = a.arguments
-            new_var = string(args[1])
-            for i in 2:lastindex(args)
-                new_var = new_var * "_" * string(args[i])
+            if a.f==getindex
+                args = a.arguments
+                new_var = string(args[1])
+                for i in 2:lastindex(args)
+                    new_var = new_var * "v" * string(args[i])
+                end
+                return Symbol(new_var)
+            else
+                return a.f.name
             end
-            return Symbol(new_var)
         else
             error("Problem generating variable name. This may happen if the variable is non-standard. Please post an issue if you get this error.")
         end
     end
 end
+get_name(a::Num) = get_name(a.val)
+get_name(a::Real) = a
 
 include(joinpath(@__DIR__, "rules.jl"))

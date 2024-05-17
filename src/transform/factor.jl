@@ -50,7 +50,8 @@ end
 factor(ex::Num) = factor(ex.val)
 factor(ex::Num, eqs::Vector{Equation}) = factor(ex.val, eqs=eqs)
 
-function factor(ex::BasicSymbolic; eqs = Equation[])
+function factor(old_ex::BasicSymbolic; eqs = Equation[])
+    ex = deepcopy(old_ex)
     binarize!(ex)
     if isfactor(ex)
         index = findall(x -> isequal(x.rhs,ex), eqs)
@@ -160,7 +161,7 @@ function factor(ex::BasicSymbolic; eqs = Equation[])
                 push!(new_args, eqs[end].lhs)
             end
         end
-        new_func = Term(ex.f, new_args)
+        new_func = SymbolicUtils.Term(ex.f, new_args)
         factor(new_func, eqs=eqs)
         return eqs
     end

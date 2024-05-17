@@ -5,11 +5,14 @@
 # See also: subroutines.jl, in this folder
 
 using DocStringExtensions, EAGO
+
+abstract type ExtendGPU <: EAGO.ExtensionType end
+
 """
 $(TYPEDEF)
 
-The ExtendGPU integrator is meant to be paired with the SourceCodeMcCormick
-package. A required component of ExtendGPU is the function `convex_func`, 
+The PointwiseGPU integrator is meant to be paired with the SourceCodeMcCormick
+package. A required component of PointwiseGPU is the function `convex_func`, 
 which should take arguments corresponding to the McCormick tuple [cc, cv, hi, lo]
 for each branch variable in the problem and return a vector of convex
 relaxation evaluations of the objective function, of length equal to the
@@ -17,7 +20,7 @@ length of the inputs.
 
 $(TYPEDFIELDS)
 """
-Base.@kwdef mutable struct ExtendGPU <: EAGO.ExtensionType
+Base.@kwdef mutable struct PointwiseGPU <: ExtendGPU
     "A user-defined function taking argument `p` and returning a vector
     of convex evaluations of the objective function"
     convex_func
@@ -49,9 +52,9 @@ Base.@kwdef mutable struct ExtendGPU <: EAGO.ExtensionType
     multistart_points::Int = 1
 end
 
-function ExtendGPU(convex_func, var_count::Int; alpha::Float64 = 0.01, node_limit::Int = 50000, 
+function PointwiseGPU(convex_func, var_count::Int; alpha::Float64 = 0.01, node_limit::Int = 50000, 
                     prepopulate::Bool = true, multistart_points::Int = 1)
-    return ExtendGPU(convex_func, var_count, node_limit, alpha, 
+    return PointwiseGPU(convex_func, var_count, node_limit, alpha, 
                     Vector{Float64}(undef, node_limit), Vector{Float64}(undef, node_limit), Vector{NodeBB}(undef, node_limit), 0,
                     Matrix{Float64}(undef, node_limit, var_count),
                     Matrix{Float64}(undef, node_limit, var_count), prepopulate, multistart_points)

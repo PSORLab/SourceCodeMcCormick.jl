@@ -1,10 +1,17 @@
 
 module SourceCodeMcCormick
 
-using ModelingToolkit
+# using ModelingToolkit
+import ModelingToolkit: Equation, ODESystem, @named, toparam, iv_from_nested_derivative, value, collect_vars!
+using Symbolics
 using SymbolicUtils.Code
 using IfElse
 using DocStringExtensions
+using Graphs
+using CUDA
+import Dates
+
+import SymbolicUtils: BasicSymbolic, exprtype, SYM, TERM, ADD, MUL, POW, DIV
 
 import SymbolicUtils: BasicSymbolic, exprtype, SYM, TERM, ADD, MUL, POW, DIV
 

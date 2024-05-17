@@ -9,7 +9,7 @@ function var_names(::McCormickTransform, a::BasicSymbolic)
         acc = genvar(Symbol(string(get_name(a))*"_cc"))
         return acv.val, acc.val
     elseif exprtype(a)==TERM
-        if varterm(a)
+        if varterm(a) && typeof(a.f)<:BasicSymbolic
             arg_list = Symbol[]
             for i in a.arguments
                 push!(arg_list, get_name(i))
@@ -84,7 +84,7 @@ end
 line_expr(x, xL, xU, zL, zU) = IfElse.ifelse(zU > zL, (zL*(xU - x) + zU*(x - xL))/(xU - xL), zU)
 
 # A symbolic way of computing the mid of three numbers (returns IfElse block)
-mid_expr(a, b, c) = IfElse.ifelse(a < b, IfElse.ifelse(b < c, b, IfElse.ifelse(c < a, a, c)),
-                        IfElse.ifelse(c < b, b, IfElse.ifelse(a < c, a, c)))
+mid_expr(x, y, z) = IfElse.ifelse(x >= y, IfElse.ifelse(y >= z, y, IfElse.ifelse(y == x, y, IfElse.ifelse(z >= x, x, z))),
+        IfElse.ifelse(z >= y, y, IfElse.ifelse(x >= z, x, z)))
 
 include(joinpath(@__DIR__, "rules.jl"))

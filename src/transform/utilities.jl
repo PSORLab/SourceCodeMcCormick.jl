@@ -8,7 +8,7 @@ op(a::Num) = op(a.val)
 # Helpful classification checker to differentiate between terms like
 # "exp(x)" where x is a variable, and terms like "y(t)" where y and t
 # are both variables
-varterm(a::BasicSymbolic) = typeof(a.f)<:BasicSymbolic ? true : false
+varterm(a::BasicSymbolic) = (typeof(a.f)<:BasicSymbolic || a.f==getindex) ? true : false
 
 # Informational functions
 function arity(a::BasicSymbolic)
@@ -37,7 +37,7 @@ function sub_1(a::BasicSymbolic)
     if exprtype(a)==SYM
         return a
     elseif exprtype(a)==TERM
-        varterm(a) || a.f==getindex && return a
+        (varterm(a) || a.f==getindex) && return a
         return a.arguments[1]
     elseif exprtype(a)==ADD
         sorted_dict = sort(collect(a.dict), by=x->string(x[1]))
@@ -55,7 +55,7 @@ function sub_2(a::BasicSymbolic)
     if exprtype(a)==SYM
         return nothing
     elseif exprtype(a)==TERM
-        varterm(a) || a.f==getindex && return nothing
+        (varterm(a) || a.f==getindex) && return nothing
         return a.arguments[2]
     elseif exprtype(a)==ADD
         ~(iszero(a.coeff)) && return a.coeff
@@ -100,7 +100,7 @@ genvar(a::Symbol) = genparam(a)
 function genparam(a::Symbol)
     params = Symbol[]
     ex = Expr(:block)
-    var_name, expr = Symbolics.construct_vars(:parameters, a, Real, nothing, nothing, nothing, ModelingToolkit.toparam, false)
+    var_name, expr = Symbolics.construct_vars(:parameters, a, Real, nothing, nothing, nothing, toparam, false)
     push!(params, var_name)
     push!(ex.args, expr)
     rhs = Symbolics.build_expr(:vect, params)
@@ -115,15 +115,15 @@ function extract_terms(eqs::Vector{Equation})
     ps = SymbolicUtils.OrderedSet()
     for eq in eqs
         if ~(eq.lhs isa Number)
-            iv = ModelingToolkit.iv_from_nested_derivative(eq.lhs)
+            iv = iv_from_nested_derivative(eq.lhs)
             break
         end
     end
-    iv = ModelingToolkit.value(iv)
+    iv = value(iv)
     for eq in eqs
         eq.lhs isa Union{SymbolicUtils.Symbolic,Number} || (push!(compressed_eqs, eq); continue)
-        ModelingToolkit.collect_vars!(allstates, ps, eq.lhs, iv)
-        ModelingToolkit.collect_vars!(allstates, ps, eq.rhs, iv)
+        collect_vars!(allstates, ps, eq.lhs, iv)
+        collect_vars!(allstates, ps, eq.rhs, iv)
     end
 
     return allstates, ps
@@ -233,11 +233,14 @@ julia> pull_vars(func)
  z
 ```
 """
+pull_vars(term::BasicSymbolic) = pull_vars(Num(term))
 function pull_vars(term::Num)
     vars = Num[]
     strings = String[]
-    vars, strings = _pull_vars(term.val, vars, strings)
-    vars = vars[sortperm(strings)]
+    if ~(typeof(term.val) <: Real)
+        vars, strings = _pull_vars(term.val, vars, strings)
+        vars = vars[sort_vars(strings)]
+    end
     return vars
 end
 
@@ -245,17 +248,23 @@ function pull_vars(terms::Vector{Num})
     vars = Num[]
     strings = String[]
     for term in terms
-        vars, strings = _pull_vars(term.val, vars, strings)
+        if ~(typeof(term.val) <: Real)
+            vars, strings = _pull_vars(term.val, vars, strings)
+        end
     end
-    vars = vars[sortperm(strings)]
+    if ~isempty(vars)
+        vars = vars[sort_vars(strings)]
+    end
     return vars
 end
 
 function pull_vars(eqn::Equation)
     vars = Num[]
     strings = String[]
-    vars, strings = _pull_vars(eqn.rhs, vars, strings)
-    vars = vars[sortperm(strings)]
+    if ~(typeof(eqn.rhs) <: Real)
+        vars, strings = _pull_vars(eqn.rhs, vars, strings)
+        vars = vars[sort_vars(strings)]
+    end
     return vars
 end
 
@@ -263,10 +272,127 @@ function pull_vars(eqns::Vector{Equation})
     vars = Num[]
     strings = String[]
     for eqn in eqns
-        vars, strings = _pull_vars(eqn.rhs, vars, strings)
+        if ~(typeof(eqn.rhs) <: Real)
+            vars, strings = _pull_vars(eqn.rhs, vars, strings)
+        end
     end
-    vars = vars[sortperm(strings)]
+    if ~isempty(vars)
+        vars = vars[sort_vars(strings)]
+    end
     return vars
+end
+
+# Sorts variables in a more logical ordering, to be consistent
+# with McCormick.jl organization. 
+function sort_vars(strings::Vector{String})
+    # isempty(strings) && return
+    sort_names = fill("", length(strings))
+    
+    # Step 1) Check for derivative-type variables
+    # @show strings
+    # split_strings = string.(hcat(split.(strings, "_")...)[1,:])
+    split_strings = first.(split.(strings, "_"))
+    if strings == split_strings
+        for i in eachindex(split_strings)
+            if split_strings[i]=="constant"
+                split_strings[i] = "_____constant"
+            end
+        end
+        return sortperm(split_strings)
+    end
+    deriv = fill(false, length(strings))
+    # Here's a way to check for derivatives if we need to go back to "d" instead of '∂'
+    # for i in eachindex(split_strings) 
+    #     for j in eachindex(split_strings)
+    #         if length(split_strings[j])==1 || split_strings[j][1] != '∂'
+    #             continue
+    #         end
+    #         if length(split_strings[j]) <= length(split_strings[i])
+    #             continue
+    #         end
+    #         if "∂"*split_strings[i] == split_strings[j][1:length(split_strings[i])+3]
+    #             deriv[j] = true
+    #         end
+    #     end
+    # end
+    for i in eachindex(split_strings)
+        if first(split_strings[i]) == '∂'
+            deriv[i] = true
+        end
+    end
+
+    # Step 2) Determine which main variables are involved
+    vars = []
+    for i in eachindex(split_strings)
+        if deriv[i]==false && ~(split_strings[i] in vars)
+            push!(vars, split_strings[i])
+        end
+    end
+    if isempty(vars) # Then all are probably derivatives and we need to read vars another way
+        for i in eachindex(split_strings)
+            new_vars = split(split_strings[i], "∂")[2:end]
+            for var in new_vars
+                if ~(var in vars)
+                    push!(vars, var)
+                end
+            end
+        end
+        return vars, strings
+    end
+
+    # Step 3) Attach simplified variable names to each element, and then
+    #         add a number identifier for the pattern: [1,2,3,4] = [cv,cc,lo,hi]
+    for i in eachindex(split_strings)
+        if ~(deriv[i]) && (split_strings[i] in vars)
+            sort_names[i] *= split_strings[i]
+            if length(strings[i]) == 1
+                sort_names[i]*="_0"
+            elseif strings[i][end-1:end] == "cv"
+                sort_names[i]*="_1"
+            elseif strings[i][end-1:end] == "cc"
+                sort_names[i]*="_2"
+            elseif strings[i][end-1:end] == "lo"
+                sort_names[i]*="_3"
+            elseif strings[i][end-1:end] == "hi"
+                sort_names[i]*="_4"
+            else
+                sort_names[i]*="_0"
+            end
+        elseif deriv[i]
+            var1 = ""
+            var2 = ""
+            for j in vars
+                if length(j) < length(split_strings[i])
+                    string_indices = collect(eachindex(split_strings[i]))
+                    if split_strings[i][string_indices[1:length(j)+1]] == "∂"*j
+                        var1 = j
+                        var2 = split_strings[i][string_indices[length(j)+2:end]]
+                    end
+                end
+            end
+            sort_names[i] *= var1
+            if strings[i][end-1:end] == "cv"
+                sort_names[i]*="__1"
+            elseif strings[i][end-1:end] == "cc"
+                sort_names[i]*="__2"
+            else
+                error("Something happened with the name scheme. Please submit an issue.")
+            end
+            sort_names[i] *= "_"*var2
+        end
+    end
+
+    # Step 4) If there is a unique variable "constant", make it appear first
+    for i in eachindex(sort_names)
+        if sort_names[i]=="constant_0"
+            sort_names[i] = "_____constant"
+        end
+    end
+
+    # Step 5) Perform the sort and return the correct ordering
+    order = sortperm(sort_names)
+
+    return order
 end
 
 function _pull_vars(term::BasicSymbolic, vars::Vector{Num}, strings::Vector{String})
@@ -279,7 +405,7 @@ function _pull_vars(term::BasicSymbolic, vars::Vector{Num}, strings::Vector{Stri
         return vars, strings
     end
     if exprtype(term)==TERM && varterm(term)
-        if ~(string(term.f) in strings)
+        if ~(string(term.f) in strings) || (term.f==getindex && ~(string(term) in string.(vars)))
             push!(strings, string(term.f))
             push!(vars, term)
             return vars, strings
@@ -288,6 +414,9 @@ function _pull_vars(term::BasicSymbolic, vars::Vector{Num}, strings::Vector{Stri
     end
     args = arguments(term)
     for arg in args
+        if typeof(arg)<:Num
+            arg = arg.val
+        end
         ~(typeof(arg)<:BasicSymbolic) ? continue : nothing
         if exprtype(arg)==SYM
             if ~(string(arg) in strings)
@@ -329,7 +458,6 @@ function shrink_eqs(eqs::Vector{Equation}, keep::Int64=4; force::Bool=false)
         lhs = string(new_eqs[1].lhs)
         replace = [false; in.(lhs, [string.(x) for x in pull_vars.(new_eqs[2:end])])]
         replacecount = sum(length.(collect.(eachmatch.(Regex("$(lhs)"), string.(new_eqs[2:end])))))
-        # println("Substituting $(length(string(new_eqs[1].rhs))), $(replacecount) times")
         if !force && length(string(new_eqs[1].rhs))*replacecount > 10000000
             @warn """Your expression may be too complicated for SourceCodeMcCormick to handle
             without using substantial CPU memory. Consider breaking your expression
@@ -397,7 +525,7 @@ out = evaluator.(x_cc, x_cv, x_hi, x_lo, y_cc, y_cv, y_hi, y_lo)
 as_array = Array(out)
 ```
 """
-function convex_evaluator(term::Num; force::Bool=false)
+function convex_evaluator(term::Num; force::Bool=false, constants::Vector{Num}=Num[])
     # First, check to see if the term is "Add". If so, we can get some
     # huge time savings by separating out the expression using the knowledge
     # that the sum of convex relaxations is equal to the convex relaxation
@@ -414,7 +542,7 @@ function convex_evaluator(term::Num; force::Bool=false)
 
             # Apply the McCormick transform to expand out the equation with auxiliary
             # variables and get expressions for each variable's relaxations
-            step_1 = apply_transform(McCormickIntervalTransform(), [equation])
+            step_1 = apply_transform(McCormickIntervalTransform(), [equation], constants=constants)
 
             # Shrink the equations down to 4 total, for "lo", "hi", "cv", and "cc"
             step_2 = shrink_eqs(step_1, force=force)
@@ -445,7 +573,7 @@ function convex_evaluator(term::Num; force::Bool=false)
     else
         # Same as previous block, but without the speedup from a_cv + b_cv = (a+b)_cv
         equation = 0 ~ term
-        step_1 = apply_transform(McCormickIntervalTransform(), [equation])
+        step_1 = apply_transform(McCormickIntervalTransform(), [equation], constants=constants)
         step_2 = shrink_eqs(step_1, force=force)
         if isnothing(step_2)
             return
@@ -456,14 +584,14 @@ function convex_evaluator(term::Num; force::Bool=false)
     return new_func, ordered_vars
 end
 
-function convex_evaluator(equation::Equation; force::Bool=false)
+function convex_evaluator(equation::Equation; force::Bool=false, constants::Vector{Num}=Num[])
     # Same as when the input is `Num`, but we have to deal with the input
     # already being an equation (whose LHS is irrelevant)
     if exprtype(equation.rhs.val) == ADD
         cv_eqn = equation.rhs.val.coeff
         for (key,val) in equation.rhs.val.dict
             new_equation = 0 ~ (val*key)
-            step_1 = apply_transform(McCormickIntervalTransform(), [new_equation])
+            step_1 = apply_transform(McCormickIntervalTransform(), [new_equation], constants=constants)
             step_2 = shrink_eqs(step_1, force=force)
             if isnothing(step_2)
                 return
@@ -474,7 +602,7 @@ function convex_evaluator(equation::Equation; force::Bool=false)
         @eval new_func = $(build_function(cv_eqn, ordered_vars..., expression=Val{true}))
 
     else
-        step_1 = apply_transform(McCormickIntervalTransform(), [equation])
+        step_1 = apply_transform(McCormickIntervalTransform(), [equation], constants=constants)
         step_2 = shrink_eqs(step_1, force=force)
         if isnothing(step_2)
             return
@@ -491,10 +619,11 @@ end
     all_evaluators(::Equation)
 
 See `convex_evaluator`. This function performs the same task, but returns
-four functions (representing lower bound, upper bound, convex relaxation,
-and concave relaxation evaluation functions) [lo, hi, cv, cc] and the order vector.
+four functions (representing functions for the convex relaxation, concave relaxation,
+lower bound of the interval extension, and upper bound of the interval extension)
+[cv, cc, lo, hi] and the order vector.
 """
-function all_evaluators(term::Num; force::Bool=false)
+function all_evaluators(term::Num; force::Bool=false, constants::Vector{Num}=Num[])
     if exprtype(term.val) == ADD
         lo_eqn = term.val.coeff
         hi_eqn = term.val.coeff
@@ -502,7 +631,7 @@ function all_evaluators(term::Num; force::Bool=false)
         cc_eqn = term.val.coeff
         for (key,val) in term.val.dict
             equation = 0 ~ (val*key)
-            step_1 = apply_transform(McCormickIntervalTransform(), [equation])
+            step_1 = apply_transform(McCormickIntervalTransform(), [equation], constants=constants)
             step_2 = shrink_eqs(step_1, force=force)
             if isnothing(step_2)
                 return
@@ -519,7 +648,7 @@ function all_evaluators(term::Num; force::Bool=false)
         @eval cc_evaluator = $(build_function(cc_eqn, ordered_vars..., expression=Val{true}))
     else
         equation = 0 ~ term
-        step_1 = apply_transform(McCormickIntervalTransform(), [equation])
+        step_1 = apply_transform(McCormickIntervalTransform(), [equation], constants=constants)
         step_2 = shrink_eqs(step_1, force=force)
         if isnothing(step_2)
             return
@@ -530,9 +659,9 @@ function all_evaluators(term::Num; force::Bool=false)
         @eval cv_evaluator = $(build_function(step_2[3].rhs, ordered_vars..., expression=Val{true}))
         @eval cc_evaluator = $(build_function(step_2[4].rhs, ordered_vars..., expression=Val{true}))
     end
-    return lo_evaluator, hi_evaluator, cv_evaluator, cc_evaluator, ordered_vars
+    return cv_evaluator, cc_evaluator, lo_evaluator, hi_evaluator, ordered_vars
 end
-function all_evaluators(equation::Equation; force::Bool=false)
+function all_evaluators(equation::Equation; force::Bool=false, constants::Vector{Num}=Num[])
     if exprtype(equation.rhs) == ADD
         lo_eqn = equation.rhs.coeff
         hi_eqn = equation.rhs.coeff
@@ -540,7 +669,7 @@ function all_evaluators(equation::Equation; force::Bool=false)
         cc_eqn = equation.rhs.coeff
         for (key,val) in equation.rhs.dict
             new_equation = 0 ~ (val*key)
-            step_1 = apply_transform(McCormickIntervalTransform(), [new_equation])
+            step_1 = apply_transform(McCormickIntervalTransform(), [new_equation], constants=constants)
             step_2 = shrink_eqs(step_1, force=force)
             if isnothing(step_2)
                 return
@@ -555,13 +684,8 @@ function all_evaluators(equation::Equation; force::Bool=false)
         @eval hi_evaluator = $(build_function(hi_eqn, ordered_vars..., expression=Val{true}))
         @eval cv_evaluator = $(build_function(cv_eqn, ordered_vars..., expression=Val{true}))
         @eval cc_evaluator = $(build_function(cc_eqn, ordered_vars..., expression=Val{true}))
-
-        @show length(string(lo_eqn))
-        @show length(string(hi_eqn))
-        @show length(string(cv_eqn))
-        @show length(string(cc_eqn))
     else
-        step_1 = apply_transform(McCormickIntervalTransform(), [equation])
+        step_1 = apply_transform(McCormickIntervalTransform(), [equation], constants=constants)
         step_2 = shrink_eqs(step_1, force=force)
         if isnothing(step_2)
             return
@@ -571,11 +695,6 @@ function all_evaluators(equation::Equation; force::Bool=false)
         @eval hi_evaluator = $(build_function(step_2[2].rhs, ordered_vars..., expression=Val{true}))
         @eval cv_evaluator = $(build_function(step_2[3].rhs, ordered_vars..., expression=Val{true}))
         @eval cc_evaluator = $(build_function(step_2[4].rhs, ordered_vars..., expression=Val{true}))
-        
-        @show length(string(step_2[1].rhs))
-        @show length(string(step_2[2].rhs))
-        @show length(string(step_2[3].rhs))
-        @show length(string(step_2[4].rhs))
     end
-    return lo_evaluator, hi_evaluator, cv_evaluator, cc_evaluator, ordered_vars
+    return cv_evaluator, cc_evaluator, lo_evaluator, hi_evaluator, ordered_vars
 end

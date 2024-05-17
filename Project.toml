@@ -1,18 +1,22 @@
 name = "SourceCodeMcCormick"
 uuid = "a7283dc5-4ecf-47fb-a95b-1412723fc960"
 authors = ["Robert Gottlieb <Robert.x.gottlieb@uconn.edu>"]
-version = "0.2.0"
+version = "0.3.0"
 
 [deps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
+Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
 IfElse = "615f187c-cbe4-4ef1-ba3b-2fcf58d6d173"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
 SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
+Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 
 [compat]
 DocStringExtensions = "0.8 - 0.9"
-ModelingToolkit = "8"
 IfElse = "0.1.0 - 0.1.1"
+ModelingToolkit = "8"
 SymbolicUtils = "1"
 julia = "1.7"
 
