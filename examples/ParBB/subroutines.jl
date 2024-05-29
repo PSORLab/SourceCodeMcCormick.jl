@@ -334,6 +334,12 @@ function default_upper_heuristic(m::EAGO.GlobalOptimizer)
     return bool
 end
 
+# Add a custom branching function that branches at the midpoint
+import EAGO: select_branch_point
+function select_branch_point(t::ExtendGPU, m::EAGO.GlobalOptimizer, i)
+    return EAGO._mid(EAGO.BranchVar(), m, i)
+end
+
 # Disable epigraph reformation, preprocessing, and postprocessing
 import EAGO: reform_epigraph_min!
 function reform_epigraph_min!(m::EAGO.GlobalOptimizer)
