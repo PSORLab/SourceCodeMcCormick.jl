@@ -1,13 +1,21 @@
 # SourceCodeMcCormick.jl
 
-This package is an experimental approach to use source-code transformation to apply McCormick relaxations
-to symbolic functions for use in deterministic global optimization. While packages like `McCormick.jl` [1]
-take set-valued McCormick objects and utilize McCormick relaxation rules to overload standard math operations,
-`SourceCodeMcCormick.jl` (SCMC) aims to interpret symbolic expressions, apply generalized McCormick rules,
-create source code that computes the McCormick relaxations and natural interval extension of the input,
-and compile the source code into functions that return pointwise values of the natural interval extension
-and convex/concave relaxations. This functionality is designed to be used for both algebraic and dynamic
-(in development) systems.
+| **PSOR Lab** | **Build Status**                                                                                |
+|:------------:|:-----------------------------------------------------------------------------------------------:|
+| [![](https://img.shields.io/badge/Developed_by-PSOR_Lab-342674)](https://psor.uconn.edu/) | [![Build Status](https://github.com/PSORLab/SourceCodeMcCormick.jl/workflows/CI/badge.svg?branch=master)](https://github.com/PSORLab/SourceCodeMcCormick.jl/actions?query=workflow%3ACI) [![codecov](https://codecov.io/gh/PSORLab/SourceCodeMcCormick.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/PSORLab/SourceCodeMcCormick.jl)|
+
+
+This package uses source-code transformation to construct McCormick-based relaxations. Expressions composed
+of `Symbolics.jl`-type variables can be passed into `SourceCodeMcCormick.jl` (`SCMC`) functions, after which
+the expressions are factored, generalized McCormick relaxation rules and inclusion monotonic interval
+extensions are applied to the factors, and the factors are recombined symbolically to create expressions
+representing convex and concave relaxations and inclusion monotonic interval extensions of the original
+expression. The new expressions are compiled into functions that return pointwise values of these
+four elements, which can be used in, e.g., a branch-and-bound routine. These functions can be used with
+floating-point values, vectors of floating-point values, or CUDA arrays of floating point values (using
+`CUDA.jl`) to return outputs of the same type.
+
+
 
 ## Algebraic Systems
 
