@@ -132,7 +132,7 @@ function transform_rule(::McCormickTransform, ::typeof(*), zL, zU, zcv, zcc, xL,
     # # This returns mult_kernel(-x,-y). Swap x with flipped x and y with flipped
     # # y, and since both are flipped, no need to worry about negative signs
     # cv = max(yL*xcc + xL*ycc - xL*yL, yU*xcc + xU*ycc - xU*yU)
-    # cc = min(yU*xcv + xL*ycv - xL*yU, yL*xcv + xL*ycv - xU*yL)
+    # cc = min(yU*xcv + xL*ycv - xL*yU, yL*xcv + xU*ycv - xU*yL)
 
 
     # # [x-,ym]

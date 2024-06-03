@@ -30,27 +30,27 @@ function var_names(::IntervalTransform, a::BasicSymbolic)
     end
 end
 
-function translate_initial_conditions(::IntervalTransform, prob::ODESystem, new_eqs::Vector{Equation})
-    vars, params = extract_terms(new_eqs)
-    var_defaults = Dict{Any, Any}()
-    param_defaults = Dict{Any, Any}()
+# function translate_initial_conditions(::IntervalTransform, prob::ODESystem, new_eqs::Vector{Equation})
+#     vars, params = extract_terms(new_eqs)
+#     var_defaults = Dict{Any, Any}()
+#     param_defaults = Dict{Any, Any}()
 
-    for (key, val) in prob.defaults
-        name_lo = String(get_name(key))*"_"*"lo"
-        name_hi = String(get_name(key))*"_"*"hi"
-        for i in vars
-            if in(String(i.f.name), (name_lo, name_hi))
-                var_defaults[i] = val
-            end
-        end
-        for i in params
-            if in(String(i.name), (name_lo, name_hi))
-                param_defaults[i] = val
-            end
-        end
-    end
-    return var_defaults, param_defaults
-end
+#     for (key, val) in prob.defaults
+#         name_lo = String(get_name(key))*"_"*"lo"
+#         name_hi = String(get_name(key))*"_"*"hi"
+#         for i in vars
+#             if in(String(i.f.name), (name_lo, name_hi))
+#                 var_defaults[i] = val
+#             end
+#         end
+#         for i in params
+#             if in(String(i.name), (name_lo, name_hi))
+#                 param_defaults[i] = val
+#             end
+#         end
+#     end
+#     return var_defaults, param_defaults
+# end
 
 
 """

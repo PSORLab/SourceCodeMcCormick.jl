@@ -34,51 +34,51 @@ function var_names(::McCormickIntervalTransform, a::Any)
 end
 
 
-function translate_initial_conditions(::McCormickTransform, prob::ODESystem, new_eqs::Vector{Equation})
-    vars, params = extract_terms(new_eqs)
-    var_defaults = Dict{Any, Any}()
-    param_defaults = Dict{Any, Any}()
+# function translate_initial_conditions(::McCormickTransform, prob::ODESystem, new_eqs::Vector{Equation})
+#     vars, params = extract_terms(new_eqs)
+#     var_defaults = Dict{Any, Any}()
+#     param_defaults = Dict{Any, Any}()
 
-    for (key, val) in prob.defaults
-        name_cv = String(get_name(key))*"_"*"cv"
-        name_cc = String(get_name(key))*"_"*"cc"
-        for i in vars
-            if String(i.f.name)==name_cv || String(i.f.name)==name_cc
-                var_defaults[i] = val
-            end
-        end
-        for i in params
-            if String(i.name)==name_cv || String(i.name)==name_cc
-                param_defaults[i] = val
-            end
-        end
-    end
-    return var_defaults, param_defaults
-end
+#     for (key, val) in prob.defaults
+#         name_cv = String(get_name(key))*"_"*"cv"
+#         name_cc = String(get_name(key))*"_"*"cc"
+#         for i in vars
+#             if String(i.f.name)==name_cv || String(i.f.name)==name_cc
+#                 var_defaults[i] = val
+#             end
+#         end
+#         for i in params
+#             if String(i.name)==name_cv || String(i.name)==name_cc
+#                 param_defaults[i] = val
+#             end
+#         end
+#     end
+#     return var_defaults, param_defaults
+# end
 
-function translate_initial_conditions(::McCormickIntervalTransform, prob::ODESystem, new_eqs::Vector{Equation})
-    vars, params = extract_terms(new_eqs)
-    var_defaults = Dict{Any, Any}()
-    param_defaults = Dict{Any, Any}()
+# function translate_initial_conditions(::McCormickIntervalTransform, prob::ODESystem, new_eqs::Vector{Equation})
+#     vars, params = extract_terms(new_eqs)
+#     var_defaults = Dict{Any, Any}()
+#     param_defaults = Dict{Any, Any}()
 
-    for (key, val) in prob.defaults
-        name_lo = String(get_name(key))*"_"*"lo"
-        name_hi = String(get_name(key))*"_"*"hi"
-        name_cv = String(get_name(key))*"_"*"cv"
-        name_cc = String(get_name(key))*"_"*"cc"
-        for i in vars
-            if in(String(i.f.name), (name_lo, name_hi, name_cv, name_cc))
-                var_defaults[i] = val
-            end
-        end
-        for i in params
-            if in(String(i.name), (name_lo, name_hi, name_cv, name_cc))
-                param_defaults[i] = val
-            end
-        end
-    end
-    return var_defaults, param_defaults
-end
+#     for (key, val) in prob.defaults
+#         name_lo = String(get_name(key))*"_"*"lo"
+#         name_hi = String(get_name(key))*"_"*"hi"
+#         name_cv = String(get_name(key))*"_"*"cv"
+#         name_cc = String(get_name(key))*"_"*"cc"
+#         for i in vars
+#             if in(String(i.f.name), (name_lo, name_hi, name_cv, name_cc))
+#                 var_defaults[i] = val
+#             end
+#         end
+#         for i in params
+#             if in(String(i.name), (name_lo, name_hi, name_cv, name_cc))
+#                 param_defaults[i] = val
+#             end
+#         end
+#     end
+#     return var_defaults, param_defaults
+# end
 
 # A symbolic way of evaluating the line segment between (xL, zL) and (xU, zU) at x (returns  IfElse block)
 line_expr(x, xL, xU, zL, zU) = IfElse.ifelse(zU > zL, (zL*(xU - x) + zU*(x - xL))/(xU - xL), zU)
