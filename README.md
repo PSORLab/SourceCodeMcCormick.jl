@@ -2,7 +2,7 @@
 
 | **PSOR Lab** | **Build Status**                                                                                |
 |:------------:|:-----------------------------------------------------------------------------------------------:|
-| [![](https://img.shields.io/badge/Developed_by-PSOR_Lab-342674)](https://psor.uconn.edu/) | [![Build Status](https://github.com/PSORLab/SourceCodeMcCormick.jl/workflows/CI/badge.svg?branch=master)](https://github.com/PSORLab/SourceCodeMcCormick.jl/actions?query=workflow%3ACI) [![codecov](https://codecov.io/gh/PSORLab/SourceCodeMcCormick.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/PSORLab/SourceCodeMcCormick.jl)|
+| [![](https://img.shields.io/badge/Developed_by-PSOR_Lab-342674)](https://psor.uconn.edu/) | [![Build Status](https://github.com/PSORLab/SourceCodeMcCormick.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/PSORLab/SourceCodeMcCormick.jl/actions?query=workflow%3ACI) [![codecov](https://codecov.io/gh/PSORLab/SourceCodeMcCormick.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/PSORLab/SourceCodeMcCormick.jl)|
 
 
 This package uses source-code transformation to construct McCormick-based relaxations. Expressions composed
