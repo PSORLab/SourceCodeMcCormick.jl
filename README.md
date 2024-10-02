@@ -194,6 +194,32 @@ where the structure of a McCormick relaxation changes more frequently with respe
 on its domain will likely perform worse than problems where the structure of the relaxation is
 more consistent.
 
+## Citing SourceCodeMcCormick
+
+Please cite the following paper when using SourceCodeMcCormick.jl. In plain text form this is:
+
+```
+Gottlieb, R. X., Xu, P., and Stuber, M. D. Automatic source code generation for deterministic
+global optimization with parallel architectures. Optimization Methods and Software, 1–39 (2024).
+DOI: 10.1080/10556788.2024.2396297
+```
+
+A BibTeX entry is given below:
+
+```bibtex
+@Article{doi:10.1080/10556788.2024.2396297,
+  author    = {Robert X. Gottlieb, Pengfei Xu, and Matthew D. Stuber},
+  journal   = {Optimization Methods and Software},
+  title     = {Automatic source code generation for deterministic global optimization with parallel architectures},
+  year      = {2024},
+  pages     = {1--39},
+  doi       = {10.1080/10556788.2024.2396297},
+  eprint    = {https://doi.org/10.1080/10556788.2024.2396297},
+  publisher = {Taylor \& Francis},
+  url       = {https://doi.org/10.1080/10556788.2024.2396297},
+}
+```
+
 ## References
 
 1. M.E. Wilhelm, R.X. Gottlieb, and M.D. Stuber, PSORLab/McCormick.jl (2020), URL
