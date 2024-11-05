@@ -217,13 +217,13 @@ end
 
 
 # Compilation run
-factory = () -> EAGO.Optimizer(SubSolvers(; t = ExtendGPU(explicit_euler_gpu64, 3)))
+factory = () -> EAGO.Optimizer(SubSolvers(; t = PointwiseGPU(explicit_euler_gpu64, 3, alpha=0.00002, node_limit=8192)))
 opt = optimizer_with_attributes(factory, "enable_optimize_hook" => true,
                                          "branch_variable" => Bool[true for i in 1:3],
                                          "force_global_solve" => true,
                                          "node_limit" => Int(3e8),
                                          "time_limit" => 10.0,
-                                         "output_iterations" => 10000)
+                                         "output_iterations" => 1)
 m = Model(opt)
 pL = [10.0, 10.0, 0.001]
 pU = [1200.0, 1200.0, 40.0]
@@ -237,7 +237,7 @@ optimize!(m)
 
 
 # Run for non-compilation timing
-factory = () -> EAGO.Optimizer(SubSolvers(; t = ExtendGPU(explicit_euler_gpu64, 3, alpha=0.00002)))
+factory = () -> EAGO.Optimizer(SubSolvers(; t = PointwiseGPU(explicit_euler_gpu64, 3, alpha=0.00002, node_limit=8192)))
 opt = optimizer_with_attributes(factory, "enable_optimize_hook" => true,
                                          "branch_variable" => Bool[true for i in 1:3],
                                          "force_global_solve" => true,

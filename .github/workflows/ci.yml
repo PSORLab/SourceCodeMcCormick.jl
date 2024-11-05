@@ -16,10 +16,10 @@ jobs:
       matrix:
 
         include:
-          - version: '1.8'
+          - version: '1.10' # LTS
             os: ubuntu-latest
             arch: x64
-          - version: '1.8'
+          - version: '1.10' # LTS
             os: windows-latest
             arch: x64
           - version: '1'

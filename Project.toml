@@ -1,7 +1,7 @@
 name = "SourceCodeMcCormick"
 uuid = "a7283dc5-4ecf-47fb-a95b-1412723fc960"
 authors = ["Robert Gottlieb <Robert.x.gottlieb@uconn.edu>"]
-version = "0.3.1"
+version = "0.4.0"
 
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
@@ -17,9 +17,9 @@ CUDA = "5"
 DocStringExtensions = "0.8 - 0.9"
 Graphs = "1"
 IfElse = "0.1.0 - 0.1.1"
-SymbolicUtils = "1"
-Symbolics = "5"
-julia = "1.6"
+SymbolicUtils = "3"
+Symbolics = "6"
+julia = "1.10"
 
 [extras]
 McCormick = "53c679d3-6890-5091-8386-c291e8c8aaa1"

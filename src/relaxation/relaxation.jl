@@ -87,4 +87,11 @@ line_expr(x, xL, xU, zL, zU) = IfElse.ifelse(zU > zL, (zL*(xU - x) + zU*(x - xL)
 mid_expr(x, y, z) = IfElse.ifelse(x >= y, IfElse.ifelse(y >= z, y, IfElse.ifelse(y == x, y, IfElse.ifelse(z >= x, x, z))),
         IfElse.ifelse(z >= y, y, IfElse.ifelse(x >= z, x, z)))
 
+mid_grad(x, y, z, ccgrad, cvgrad, zerovec) = IfElse.ifelse(x >= y, IfElse.ifelse(y >= z, cvgrad, IfElse.ifelse(y == x, cvgrad, IfElse.ifelse(z >= x, ccgrad, zerovec))),
+        IfElse.ifelse(z >= y, cvgrad, IfElse.ifelse(x >= z, ccgrad, zerovec)))
+
+# # Equation (29) from Ye2023
+# psi_cv(a, xcv, xcc) = IfElse.ifelse(a >= 0.0, a*xcv, a*xcc)
+# psi_cc(a, xcv, xcc) = IfElse.ifelse(a >= 0.0, a*xcc, a*xcv)
+
 include(joinpath(@__DIR__, "rules.jl"))

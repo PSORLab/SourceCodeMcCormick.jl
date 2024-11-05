@@ -128,6 +128,14 @@ end
 mult_cv_case(A::MC, B::MC) = mult_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv, B.cc, B.Intv.lo, B.Intv.hi)
 mult_cc_case(A::MC, B::MC) = mult_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv, B.cc, B.Intv.lo, B.Intv.hi)
 
+function eval_check_grad_mult(eval_func, MC1, MC2)
+    return eval_func(MC1.cv, MC1.cc, MC1.Intv.lo, MC1.Intv.hi, MC1.cv_grad[1], MC1.cv_grad[2], MC1.cc_grad[1], MC1.cc_grad[2],
+                     MC2.cv, MC2.cc, MC2.Intv.lo, MC2.Intv.hi, MC2.cv_grad[1], MC2.cv_grad[2], MC2.cc_grad[1], MC2.cc_grad[2])
+end
+function eval_check_grad_mult(eval_func, MC1)
+    return eval_func(MC1.Intv.lo, MC1.Intv.hi, MC1.cv_grad[1], MC1.cc_grad[1])
+end
+
 # For multiplication, need to test all cases with MC*MC, then several cases with Real types
 @testset "Multiplication" begin
     @variables x, y
@@ -139,45 +147,59 @@ mult_cc_case(A::MC, B::MC) = mult_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv
 
     to_compute = 5.0*y
     posreal_mult_cv, posreal_mult_cc, posreal_mult_lo, posreal_mult_hi, posreal_order = all_evaluators(to_compute)
+    posreal_mult_cvgrad, posreal_mult_ccgrad, posreal_order_grad = all_subgradients(to_compute, expand=true)
     
     to_compute = -5.0*y
     negreal_mult_cv, negreal_mult_cc, negreal_mult_lo, negreal_mult_hi, negreal_order = all_evaluators(to_compute)
+    negreal_mult_cvgrad, negreal_mult_ccgrad, negreal_order_grad = all_subgradients(to_compute, expand=true)
 
     # pos*pos
     @test abs(eval_check(posreal_mult_cv, pos) - (5.0*pos).cv) <= 1E-15
     @test abs(eval_check(posreal_mult_cc, pos) - (5.0*pos).cc) <= 1E-15
     @test abs(eval_check(posreal_mult_lo, pos) - (5.0*pos).Intv.lo) <= 1E-15
     @test abs(eval_check(posreal_mult_hi, pos) - (5.0*pos).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad_mult(posreal_mult_cvgrad[1], pos) - (5.0*pos).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(posreal_mult_ccgrad[1], pos) - (5.0*pos).cc_grad[1]) <= 1E-15
 
     # pos*mix
     @test abs(eval_check(posreal_mult_cv, mix) - (5.0*mix).cv) <= 1E-15
     @test abs(eval_check(posreal_mult_cc, mix) - (5.0*mix).cc) <= 1E-15
     @test abs(eval_check(posreal_mult_lo, mix) - (5.0*mix).Intv.lo) <= 1E-15
     @test abs(eval_check(posreal_mult_hi, mix) - (5.0*mix).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad_mult(posreal_mult_cvgrad[1], mix) - (5.0*mix).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(posreal_mult_ccgrad[1], mix) - (5.0*mix).cc_grad[1]) <= 1E-15
     
     # pos*neg
     @test abs(eval_check(posreal_mult_cv, neg) - (5.0*neg).cv) <= 1E-15
     @test abs(eval_check(posreal_mult_cc, neg) - (5.0*neg).cc) <= 1E-15
     @test abs(eval_check(posreal_mult_lo, neg) - (5.0*neg).Intv.lo) <= 1E-15
     @test abs(eval_check(posreal_mult_hi, neg) - (5.0*neg).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad_mult(posreal_mult_cvgrad[1], neg) - (5.0*neg).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(posreal_mult_ccgrad[1], neg) - (5.0*neg).cc_grad[1]) <= 1E-15
 
     # neg*pos
     @test abs(eval_check(negreal_mult_cv, pos) - (-5.0*pos).cv) <= 1E-15
     @test abs(eval_check(negreal_mult_cc, pos) - (-5.0*pos).cc) <= 1E-15
     @test abs(eval_check(negreal_mult_lo, pos) - (-5.0*pos).Intv.lo) <= 1E-15
     @test abs(eval_check(negreal_mult_hi, pos) - (-5.0*pos).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad_mult(negreal_mult_cvgrad[1], pos) - (-5.0*pos).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(negreal_mult_ccgrad[1], pos) - (-5.0*pos).cc_grad[1]) <= 1E-15
 
     # neg*mix
     @test abs(eval_check(negreal_mult_cv, mix) - (-5.0*mix).cv) <= 1E-15
     @test abs(eval_check(negreal_mult_cc, mix) - (-5.0*mix).cc) <= 1E-15
     @test abs(eval_check(negreal_mult_lo, mix) - (-5.0*mix).Intv.lo) <= 1E-15
     @test abs(eval_check(negreal_mult_hi, mix) - (-5.0*mix).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad_mult(negreal_mult_cvgrad[1], mix) - (-5.0*mix).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(negreal_mult_ccgrad[1], mix) - (-5.0*mix).cc_grad[1]) <= 1E-15
     
     # neg*neg
     @test abs(eval_check(negreal_mult_cv, neg) - (-5.0*neg).cv) <= 1E-15
     @test abs(eval_check(negreal_mult_cc, neg) - (-5.0*neg).cc) <= 1E-15
     @test abs(eval_check(negreal_mult_lo, neg) - (-5.0*neg).Intv.lo) <= 1E-15
     @test abs(eval_check(negreal_mult_hi, neg) - (-5.0*neg).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad_mult(negreal_mult_cvgrad[1], neg) - (-5.0*neg).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(negreal_mult_ccgrad[1], neg) - (-5.0*neg).cc_grad[1]) <= 1E-15
 
 
     # McCormick object times a McCormick object. Verify that cases are satisfied before
@@ -193,6 +215,7 @@ mult_cc_case(A::MC, B::MC) = mult_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv
     @variables x, y
     to_compute = x*y
     mult_cv, mult_cc, mult_lo, mult_hi, order = all_evaluators(to_compute)
+    mult_cvgrad, mult_ccgrad, order_grad = all_subgradients(to_compute, expand=true)
 
     @test mult_cv_case(pos, pos_hi) == 1
     @test mult_cc_case(pos, pos_hi) == 1
@@ -200,6 +223,10 @@ mult_cc_case(A::MC, B::MC) = mult_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv
     @test abs(eval_check(mult_cc, pos, pos_hi) - (pos*pos_hi).cc) <= 1E-15
     @test abs(eval_check(mult_lo, pos, pos_hi) - (pos*pos_hi).Intv.lo) <= 1E-15
     @test abs(eval_check(mult_hi, pos, pos_hi) - (pos*pos_hi).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[1], pos, pos_hi) - (pos*pos_hi).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[2], pos, pos_hi) - (pos*pos_hi).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[1], pos, pos_hi) - (pos*pos_hi).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[2], pos, pos_hi) - (pos*pos_hi).cc_grad[2]) <= 1E-15
     
     @test mult_cv_case(pos, pos) == 2
     @test mult_cc_case(pos, pos) == 2
@@ -207,6 +234,10 @@ mult_cc_case(A::MC, B::MC) = mult_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv
     @test abs(eval_check(mult_cc, pos, pos) - (pos*pos).cc) <= 1E-15
     @test abs(eval_check(mult_lo, pos, pos) - (pos*pos).Intv.lo) <= 1E-15
     @test abs(eval_check(mult_hi, pos, pos) - (pos*pos).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[1], pos, pos) - (pos*pos).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[2], pos, pos) - (pos*pos).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[1], pos, pos) - (pos*pos).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[2], pos, pos) - (pos*pos).cc_grad[2]) <= 1E-15
     
     @test mult_cv_case(pos, neg_hi) == 3
     @test mult_cc_case(pos, neg_hi) == 3
@@ -214,6 +245,10 @@ mult_cc_case(A::MC, B::MC) = mult_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv
     @test abs(eval_check(mult_cc, pos, neg_hi) - (pos*neg_hi).cc) <= 1E-15
     @test abs(eval_check(mult_lo, pos, neg_hi) - (pos*neg_hi).Intv.lo) <= 1E-15
     @test abs(eval_check(mult_hi, pos, neg_hi) - (pos*neg_hi).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[1], pos, neg_hi) - (pos*neg_hi).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[2], pos, neg_hi) - (pos*neg_hi).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[1], pos, neg_hi) - (pos*neg_hi).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[2], pos, neg_hi) - (pos*neg_hi).cc_grad[2]) <= 1E-15
     
     @test mult_cv_case(pos, neg) == 4
     @test mult_cc_case(pos, neg) == 4
@@ -221,6 +256,10 @@ mult_cc_case(A::MC, B::MC) = mult_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv
     @test abs(eval_check(mult_cc, pos, neg) - (pos*neg).cc) <= 1E-15
     @test abs(eval_check(mult_lo, pos, neg) - (pos*neg).Intv.lo) <= 1E-15
     @test abs(eval_check(mult_hi, pos, neg) - (pos*neg).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[1], pos, neg) - (pos*neg).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[2], pos, neg) - (pos*neg).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[1], pos, neg) - (pos*neg).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[2], pos, neg) - (pos*neg).cc_grad[2]) <= 1E-15
     
     @test mult_cv_case(pos_hi, mix) == 5
     @test mult_cc_case(pos_hi, mix) == 5
@@ -228,6 +267,10 @@ mult_cc_case(A::MC, B::MC) = mult_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv
     @test abs(eval_check(mult_cc, pos_hi, mix) - (pos_hi*mix).cc) <= 1E-15
     @test abs(eval_check(mult_lo, pos_hi, mix) - (pos_hi*mix).Intv.lo) <= 1E-15
     @test abs(eval_check(mult_hi, pos_hi, mix) - (pos_hi*mix).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[1], pos_hi, mix) - (pos_hi*mix).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[2], pos_hi, mix) - (pos_hi*mix).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[1], pos_hi, mix) - (pos_hi*mix).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[2], pos_hi, mix) - (pos_hi*mix).cc_grad[2]) <= 1E-15
     
     @test mult_cv_case(pos, mix) == 6
     @test mult_cc_case(pos, mix) == 6
@@ -235,6 +278,10 @@ mult_cc_case(A::MC, B::MC) = mult_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv
     @test abs(eval_check(mult_cc, pos, mix) - (pos*mix).cc) <= 1E-15
     @test abs(eval_check(mult_lo, pos, mix) - (pos*mix).Intv.lo) <= 1E-15
     @test abs(eval_check(mult_hi, pos, mix) - (pos*mix).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[1], pos, mix) - (pos*mix).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[2], pos, mix) - (pos*mix).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[1], pos, mix) - (pos*mix).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[2], pos, mix) - (pos*mix).cc_grad[2]) <= 1E-15
     
     @test mult_cv_case(neg, pos_hi) == 7
     @test mult_cc_case(neg, pos_hi) == 7
@@ -242,6 +289,10 @@ mult_cc_case(A::MC, B::MC) = mult_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv
     @test abs(eval_check(mult_cc, neg, pos_hi) - (neg*pos_hi).cc) <= 1E-15
     @test abs(eval_check(mult_lo, neg, pos_hi) - (neg*pos_hi).Intv.lo) <= 1E-15
     @test abs(eval_check(mult_hi, neg, pos_hi) - (neg*pos_hi).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[1], neg, pos_hi) - (neg*pos_hi).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[2], neg, pos_hi) - (neg*pos_hi).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[1], neg, pos_hi) - (neg*pos_hi).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[2], neg, pos_hi) - (neg*pos_hi).cc_grad[2]) <= 1E-15
     
     @test mult_cv_case(neg, pos) == 8
     @test mult_cc_case(neg, pos) == 8
@@ -249,6 +300,10 @@ mult_cc_case(A::MC, B::MC) = mult_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv
     @test abs(eval_check(mult_cc, neg, pos) - (neg*pos).cc) <= 1E-15
     @test abs(eval_check(mult_lo, neg, pos) - (neg*pos).Intv.lo) <= 1E-15
     @test abs(eval_check(mult_hi, neg, pos) - (neg*pos).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[1], neg, pos) - (neg*pos).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[2], neg, pos) - (neg*pos).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[1], neg, pos) - (neg*pos).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[2], neg, pos) - (neg*pos).cc_grad[2]) <= 1E-15
     
     @test mult_cv_case(neg, neg_hi) == 9
     @test mult_cc_case(neg, neg_hi) == 9
@@ -256,6 +311,10 @@ mult_cc_case(A::MC, B::MC) = mult_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv
     @test abs(eval_check(mult_cc, neg, neg_hi) - (neg*neg_hi).cc) <= 1E-15
     @test abs(eval_check(mult_lo, neg, neg_hi) - (neg*neg_hi).Intv.lo) <= 1E-15
     @test abs(eval_check(mult_hi, neg, neg_hi) - (neg*neg_hi).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[1], neg, neg_hi) - (neg*neg_hi).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[2], neg, neg_hi) - (neg*neg_hi).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[1], neg, neg_hi) - (neg*neg_hi).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[2], neg, neg_hi) - (neg*neg_hi).cc_grad[2]) <= 1E-15
     
     @test mult_cv_case(neg, neg) == 10
     @test mult_cc_case(neg, neg) == 10
@@ -263,6 +322,10 @@ mult_cc_case(A::MC, B::MC) = mult_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv
     @test abs(eval_check(mult_cc, neg, neg) - (neg*neg).cc) <= 1E-15
     @test abs(eval_check(mult_lo, neg, neg) - (neg*neg).Intv.lo) <= 1E-15
     @test abs(eval_check(mult_hi, neg, neg) - (neg*neg).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[1], neg, neg) - (neg*neg).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[2], neg, neg) - (neg*neg).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[1], neg, neg) - (neg*neg).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[2], neg, neg) - (neg*neg).cc_grad[2]) <= 1E-15
     
     @test mult_cv_case(neg, mix) == 11
     @test mult_cc_case(neg, mix) == 11
@@ -270,6 +333,10 @@ mult_cc_case(A::MC, B::MC) = mult_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv
     @test abs(eval_check(mult_cc, neg, mix) - (neg*mix).cc) <= 1E-15
     @test abs(eval_check(mult_lo, neg, mix) - (neg*mix).Intv.lo) <= 1E-15
     @test abs(eval_check(mult_hi, neg, mix) - (neg*mix).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[1], neg, mix) - (neg*mix).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[2], neg, mix) - (neg*mix).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[1], neg, mix) - (neg*mix).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[2], neg, mix) - (neg*mix).cc_grad[2]) <= 1E-15
     
     @test mult_cv_case(neg_hi, mix) == 12
     @test mult_cc_case(neg_hi, mix) == 12
@@ -277,6 +344,10 @@ mult_cc_case(A::MC, B::MC) = mult_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv
     @test abs(eval_check(mult_cc, neg_hi, mix) - (neg_hi*mix).cc) <= 1E-15
     @test abs(eval_check(mult_lo, neg_hi, mix) - (neg_hi*mix).Intv.lo) <= 1E-15
     @test abs(eval_check(mult_hi, neg_hi, mix) - (neg_hi*mix).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[1], neg_hi, mix) - (neg_hi*mix).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[2], neg_hi, mix) - (neg_hi*mix).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[1], neg_hi, mix) - (neg_hi*mix).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[2], neg_hi, mix) - (neg_hi*mix).cc_grad[2]) <= 1E-15
     
     @test mult_cv_case(mix, pos_hi) == 13
     @test mult_cc_case(mix, pos_hi) == 13
@@ -284,6 +355,10 @@ mult_cc_case(A::MC, B::MC) = mult_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv
     @test abs(eval_check(mult_cc, mix, pos_hi) - (mix*pos_hi).cc) <= 1E-15
     @test abs(eval_check(mult_lo, mix, pos_hi) - (mix*pos_hi).Intv.lo) <= 1E-15
     @test abs(eval_check(mult_hi, mix, pos_hi) - (mix*pos_hi).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[1], mix, pos_hi) - (mix*pos_hi).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[2], mix, pos_hi) - (mix*pos_hi).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[1], mix, pos_hi) - (mix*pos_hi).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[2], mix, pos_hi) - (mix*pos_hi).cc_grad[2]) <= 1E-15
     
     @test mult_cv_case(mix, pos) == 14
     @test mult_cc_case(mix, pos) == 14
@@ -291,6 +366,10 @@ mult_cc_case(A::MC, B::MC) = mult_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv
     @test abs(eval_check(mult_cc, mix, pos) - (mix*pos).cc) <= 1E-15
     @test abs(eval_check(mult_lo, mix, pos) - (mix*pos).Intv.lo) <= 1E-15
     @test abs(eval_check(mult_hi, mix, pos) - (mix*pos).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[1], mix, pos) - (mix*pos).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[2], mix, pos) - (mix*pos).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[1], mix, pos) - (mix*pos).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[2], mix, pos) - (mix*pos).cc_grad[2]) <= 1E-15
     
     @test mult_cv_case(mix, neg) == 15
     @test mult_cc_case(mix, neg) == 15
@@ -298,6 +377,10 @@ mult_cc_case(A::MC, B::MC) = mult_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv
     @test abs(eval_check(mult_cc, mix, neg) - (mix*neg).cc) <= 1E-15
     @test abs(eval_check(mult_lo, mix, neg) - (mix*neg).Intv.lo) <= 1E-15
     @test abs(eval_check(mult_hi, mix, neg) - (mix*neg).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[1], mix, neg) - (mix*neg).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[2], mix, neg) - (mix*neg).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[1], mix, neg) - (mix*neg).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[2], mix, neg) - (mix*neg).cc_grad[2]) <= 1E-15
     
     @test mult_cv_case(mix, neg_hi) == 16
     @test mult_cc_case(mix, neg_hi) == 16
@@ -305,6 +388,10 @@ mult_cc_case(A::MC, B::MC) = mult_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv
     @test abs(eval_check(mult_cc, mix, neg_hi) - (mix*neg_hi).cc) <= 1E-15
     @test abs(eval_check(mult_lo, mix, neg_hi) - (mix*neg_hi).Intv.lo) <= 1E-15
     @test abs(eval_check(mult_hi, mix, neg_hi) - (mix*neg_hi).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[1], mix, neg_hi) - (mix*neg_hi).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[2], mix, neg_hi) - (mix*neg_hi).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[1], mix, neg_hi) - (mix*neg_hi).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[2], mix, neg_hi) - (mix*neg_hi).cc_grad[2]) <= 1E-15
     
     @test mult_cv_case(mix, mix_lo) == 17
     @test mult_cc_case(mix, mix_lo) == 17
@@ -312,6 +399,10 @@ mult_cc_case(A::MC, B::MC) = mult_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv
     @test abs(eval_check(mult_cc, mix, mix_lo) - (mix*mix_lo).cc) <= 1E-15
     @test abs(eval_check(mult_lo, mix, mix_lo) - (mix*mix_lo).Intv.lo) <= 1E-15
     @test abs(eval_check(mult_hi, mix, mix_lo) - (mix*mix_lo).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[1], mix, mix_lo) - (mix*mix_lo).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[2], mix, mix_lo) - (mix*mix_lo).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[1], mix, mix_lo) - (mix*mix_lo).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[2], mix, mix_lo) - (mix*mix_lo).cc_grad[2]) <= 1E-15
     
     @test mult_cv_case(mix, mix_hi) == 18
     @test mult_cc_case(mix, mix_hi) == 18
@@ -319,4 +410,8 @@ mult_cc_case(A::MC, B::MC) = mult_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv
     @test abs(eval_check(mult_cc, mix, mix_hi) - (mix*mix_hi).cc) <= 1E-15
     @test abs(eval_check(mult_lo, mix, mix_hi) - (mix*mix_hi).Intv.lo) <= 1E-15
     @test abs(eval_check(mult_hi, mix, mix_hi) - (mix*mix_hi).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[1], mix, mix_hi) - (mix*mix_hi).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_cvgrad[2], mix, mix_hi) - (mix*mix_hi).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[1], mix, mix_hi) - (mix*mix_hi).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad_mult(mult_ccgrad[2], mix, mix_hi) - (mix*mix_hi).cc_grad[2]) <= 1E-15
 end
