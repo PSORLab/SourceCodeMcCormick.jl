@@ -1,6 +1,8 @@
 mid_expr(x, y, z) = IfElse.ifelse(x >= y, IfElse.ifelse(y >= z, y, IfElse.ifelse(y == x, y, IfElse.ifelse(z >= x, x, z))),
         IfElse.ifelse(z >= y, y, IfElse.ifelse(x >= z, x, z)))
 
+mid_grad(x, y, z, ccgrad, cvgrad, zerovec) = IfElse.ifelse(x >= y, IfElse.ifelse(y >= z, cvgrad, IfElse.ifelse(y == x, cvgrad, IfElse.ifelse(z >= x, ccgrad, zerovec))),
+        IfElse.ifelse(z >= y, cvgrad, IfElse.ifelse(x >= z, ccgrad, zerovec)))
 function div_cv_case(xcv, xcc, xL, xU, ycv, ycc, yL, yU)
     yL_inv = inv(yU)
     yU_inv = inv(yL)
@@ -139,15 +141,19 @@ div_cc_case(A::MC, B::MC) = div_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv, 
 
     to_compute = 5.0/y
     posreal_div_cv, posreal_div_cc, posreal_div_lo, posreal_div_hi, posreal_order = all_evaluators(to_compute)
+    posreal_div_cvgrad, posreal_div_ccgrad, posreal_order_grad = all_subgradients(to_compute, expand=true)
     
     to_compute = -5.0/y
     negreal_div_cv, negreal_div_cc, negreal_div_lo, negreal_div_hi, negreal_order = all_evaluators(to_compute)
+    negreal_div_cvgrad, negreal_div_ccgrad, negreal_order_grad = all_subgradients(to_compute, expand=true)
 
     # pos/pos
     @test abs(eval_check(posreal_div_cv, pos) - (5.0/pos).cv) <= 1E-15
     @test abs(eval_check(posreal_div_cc, pos) - (5.0/pos).cc) <= 1E-15
     @test abs(eval_check(posreal_div_lo, pos) - (5.0/pos).Intv.lo) <= 1E-15
     @test abs(eval_check(posreal_div_hi, pos) - (5.0/pos).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad(posreal_div_cvgrad[1], pos) - (5.0/pos).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(posreal_div_ccgrad[1], pos) - (5.0/pos).cc_grad[1]) <= 1E-15
 
     # pos/mix
     @test isnan(eval_check(posreal_div_cv, mix))
@@ -158,18 +164,26 @@ div_cc_case(A::MC, B::MC) = div_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv, 
     @test isnan((5.0/mix).Intv.lo)
     @test isnan(eval_check(posreal_div_hi, mix))
     @test isnan((5.0/mix).Intv.hi)
+    @test isnan(eval_check_grad(posreal_div_cvgrad[1], mix))
+    @test isnan((5.0/mix).cv_grad[1])
+    @test isnan(eval_check_grad(posreal_div_ccgrad[1], mix))
+    @test isnan((5.0/mix).cc_grad[1])
     
     # pos/neg
     @test abs(eval_check(posreal_div_cv, neg) - (5.0/neg).cv) <= 1E-15
     @test abs(eval_check(posreal_div_cc, neg) - (5.0/neg).cc) <= 1E-15
     @test abs(eval_check(posreal_div_lo, neg) - (5.0/neg).Intv.lo) <= 1E-15
     @test abs(eval_check(posreal_div_hi, neg) - (5.0/neg).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad(posreal_div_cvgrad[1], neg) - (5.0/neg).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(posreal_div_ccgrad[1], neg) - (5.0/neg).cc_grad[1]) <= 1E-15
 
     # neg/pos
     @test abs(eval_check(negreal_div_cv, pos) - (-5.0/pos).cv) <= 1E-15
     @test abs(eval_check(negreal_div_cc, pos) - (-5.0/pos).cc) <= 1E-15
     @test abs(eval_check(negreal_div_lo, pos) - (-5.0/pos).Intv.lo) <= 1E-15
     @test abs(eval_check(negreal_div_hi, pos) - (-5.0/pos).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad(negreal_div_cvgrad[1], pos) - (-5.0/pos).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(negreal_div_ccgrad[1], pos) - (-5.0/pos).cc_grad[1]) <= 1E-15
 
     # neg/mix
     @test isnan(eval_check(negreal_div_cv, mix))
@@ -180,12 +194,18 @@ div_cc_case(A::MC, B::MC) = div_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv, 
     @test isnan((-5.0/mix).Intv.lo)
     @test isnan(eval_check(negreal_div_hi, mix))
     @test isnan((-5.0/mix).Intv.hi)
+    @test isnan(eval_check_grad(negreal_div_cvgrad[1], mix))
+    @test isnan((-5.0/mix).cv_grad[1])
+    @test isnan(eval_check_grad(negreal_div_ccgrad[1], mix))
+    @test isnan((-5.0/mix).cc_grad[1])
     
     # neg/neg
     @test abs(eval_check(negreal_div_cv, neg) - (-5.0/neg).cv) <= 1E-15
     @test abs(eval_check(negreal_div_cc, neg) - (-5.0/neg).cc) <= 1E-15
     @test abs(eval_check(negreal_div_lo, neg) - (-5.0/neg).Intv.lo) <= 1E-15
     @test abs(eval_check(negreal_div_hi, neg) - (-5.0/neg).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad(negreal_div_cvgrad[1], neg) - (-5.0/neg).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(negreal_div_ccgrad[1], neg) - (-5.0/neg).cc_grad[1]) <= 1E-15
 
     # Note: McCormick object divided by a real automatically converts from (MC/real) to (MC*(real^-1))
     # through Symbolics.jl, so this is simply multiplication.
@@ -204,6 +224,7 @@ div_cc_case(A::MC, B::MC) = div_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv, 
     @variables x, y
     to_compute = x/y
     div_cv, div_cc, div_lo, div_hi, order = all_evaluators(to_compute)
+    div_cvgrad, div_ccgrad, order_grad = all_subgradients(to_compute, expand=true)
 
     @test div_cv_case(pos, pos_lo) == 1
     @test div_cc_case(pos, pos_lo) == 1
@@ -211,6 +232,10 @@ div_cc_case(A::MC, B::MC) = div_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv, 
     @test abs(eval_check(div_cc, pos, pos_lo) - (pos/pos_lo).cc) <= 1E-15
     @test abs(eval_check(div_lo, pos, pos_lo) - (pos/pos_lo).Intv.lo) <= 1E-15
     @test abs(eval_check(div_hi, pos, pos_lo) - (pos/pos_lo).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad(div_cvgrad[1], pos, pos_lo) - (pos/pos_lo).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(div_cvgrad[2], pos, pos_lo) - (pos/pos_lo).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad(div_ccgrad[1], pos, pos_lo) - (pos/pos_lo).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(div_ccgrad[2], pos, pos_lo) - (pos/pos_lo).cc_grad[2]) <= 1E-15
     
     @test div_cv_case(pos, pos_hi) == 2
     @test div_cc_case(pos, pos_hi) == 2
@@ -218,6 +243,10 @@ div_cc_case(A::MC, B::MC) = div_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv, 
     @test abs(eval_check(div_cc, pos, pos_hi) - (pos/pos_hi).cc) <= 1E-15
     @test abs(eval_check(div_lo, pos, pos_hi) - (pos/pos_hi).Intv.lo) <= 1E-15
     @test abs(eval_check(div_hi, pos, pos_hi) - (pos/pos_hi).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad(div_cvgrad[1], pos, pos_hi) - (pos/pos_hi).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(div_cvgrad[2], pos, pos_hi) - (pos/pos_hi).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad(div_ccgrad[1], pos, pos_hi) - (pos/pos_hi).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(div_ccgrad[2], pos, pos_hi) - (pos/pos_hi).cc_grad[2]) <= 1E-15
     
     @test div_cv_case(pos, neg_lo) == 3
     @test div_cc_case(pos, neg_lo) == 3
@@ -225,6 +254,10 @@ div_cc_case(A::MC, B::MC) = div_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv, 
     @test abs(eval_check(div_cc, pos, neg_lo) - (pos/neg_lo).cc) <= 1E-15
     @test abs(eval_check(div_lo, pos, neg_lo) - (pos/neg_lo).Intv.lo) <= 1E-15
     @test abs(eval_check(div_hi, pos, neg_lo) - (pos/neg_lo).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad(div_cvgrad[1], pos, neg_lo) - (pos/neg_lo).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(div_cvgrad[2], pos, neg_lo) - (pos/neg_lo).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad(div_ccgrad[1], pos, neg_lo) - (pos/neg_lo).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(div_ccgrad[2], pos, neg_lo) - (pos/neg_lo).cc_grad[2]) <= 1E-15
     
     @test div_cv_case(pos, neg) == 4
     @test div_cc_case(pos, neg) == 4
@@ -232,6 +265,10 @@ div_cc_case(A::MC, B::MC) = div_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv, 
     @test abs(eval_check(div_cc, pos, neg) - (pos/neg).cc) <= 1E-15
     @test abs(eval_check(div_lo, pos, neg) - (pos/neg).Intv.lo) <= 1E-15
     @test abs(eval_check(div_hi, pos, neg) - (pos/neg).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad(div_cvgrad[1], pos, neg) - (pos/neg).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(div_cvgrad[2], pos, neg) - (pos/neg).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad(div_ccgrad[1], pos, neg) - (pos/neg).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(div_ccgrad[2], pos, neg) - (pos/neg).cc_grad[2]) <= 1E-15
     
     @test div_cv_case(pos_hi, mix) == 5
     @test div_cc_case(pos_hi, mix) == 5
@@ -243,6 +280,14 @@ div_cc_case(A::MC, B::MC) = div_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv, 
     @test isnan((pos_hi/mix).Intv.lo)
     @test isnan(eval_check(div_hi, pos_hi, mix))
     @test isnan((pos_hi/mix).Intv.hi)
+    @test isnan(eval_check_grad(div_cvgrad[1], pos_hi, mix))
+    @test isnan((pos_hi/mix).cv_grad[1])
+    @test isnan(eval_check_grad(div_cvgrad[2], pos_hi, mix))
+    @test isnan((pos_hi/mix).cv_grad[2])
+    @test isnan(eval_check_grad(div_ccgrad[1], pos_hi, mix))
+    @test isnan((pos_hi/mix).cc_grad[1])
+    @test isnan(eval_check_grad(div_ccgrad[2], pos_hi, mix))
+    @test isnan((pos_hi/mix).cc_grad[2])
 
     @test div_cv_case(neg, pos_lo) == 6
     @test div_cc_case(neg, pos_lo) == 6
@@ -250,6 +295,10 @@ div_cc_case(A::MC, B::MC) = div_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv, 
     @test abs(eval_check(div_cc, neg, pos_lo) - (neg/pos_lo).cc) <= 1E-15
     @test abs(eval_check(div_lo, neg, pos_lo) - (neg/pos_lo).Intv.lo) <= 1E-15
     @test abs(eval_check(div_hi, neg, pos_lo) - (neg/pos_lo).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad(div_cvgrad[1], neg, pos_lo) - (neg/pos_lo).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(div_cvgrad[2], neg, pos_lo) - (neg/pos_lo).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad(div_ccgrad[1], neg, pos_lo) - (neg/pos_lo).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(div_ccgrad[2], neg, pos_lo) - (neg/pos_lo).cc_grad[2]) <= 1E-15
     
     @test div_cv_case(neg, pos_hi) == 7
     @test div_cc_case(neg, pos_hi) == 7
@@ -257,6 +306,10 @@ div_cc_case(A::MC, B::MC) = div_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv, 
     @test abs(eval_check(div_cc, neg, pos_hi) - (neg/pos_hi).cc) <= 1E-15
     @test abs(eval_check(div_lo, neg, pos_hi) - (neg/pos_hi).Intv.lo) <= 1E-15
     @test abs(eval_check(div_hi, neg, pos_hi) - (neg/pos_hi).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad(div_cvgrad[1], neg, pos_hi) - (neg/pos_hi).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(div_cvgrad[2], neg, pos_hi) - (neg/pos_hi).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad(div_ccgrad[1], neg, pos_hi) - (neg/pos_hi).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(div_ccgrad[2], neg, pos_hi) - (neg/pos_hi).cc_grad[2]) <= 1E-15
     
     @test div_cv_case(neg, neg_lo) == 8
     @test div_cc_case(neg, neg_lo) == 8
@@ -264,6 +317,10 @@ div_cc_case(A::MC, B::MC) = div_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv, 
     @test abs(eval_check(div_cc, neg, neg_lo) - (neg/neg_lo).cc) <= 1E-15
     @test abs(eval_check(div_lo, neg, neg_lo) - (neg/neg_lo).Intv.lo) <= 1E-15
     @test abs(eval_check(div_hi, neg, neg_lo) - (neg/neg_lo).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad(div_cvgrad[1], neg, neg_lo) - (neg/neg_lo).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(div_cvgrad[2], neg, neg_lo) - (neg/neg_lo).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad(div_ccgrad[1], neg, neg_lo) - (neg/neg_lo).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(div_ccgrad[2], neg, neg_lo) - (neg/neg_lo).cc_grad[2]) <= 1E-15
     
     @test div_cv_case(neg, neg_hi) == 9
     @test div_cc_case(neg, neg_hi) == 9
@@ -271,6 +328,10 @@ div_cc_case(A::MC, B::MC) = div_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv, 
     @test abs(eval_check(div_cc, neg, neg_hi) - (neg/neg_hi).cc) <= 1E-15
     @test abs(eval_check(div_lo, neg, neg_hi) - (neg/neg_hi).Intv.lo) <= 1E-15
     @test abs(eval_check(div_hi, neg, neg_hi) - (neg/neg_hi).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad(div_cvgrad[1], neg, neg_hi) - (neg/neg_hi).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(div_cvgrad[2], neg, neg_hi) - (neg/neg_hi).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad(div_ccgrad[1], neg, neg_hi) - (neg/neg_hi).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(div_ccgrad[2], neg, neg_hi) - (neg/neg_hi).cc_grad[2]) <= 1E-15
     
     @test div_cv_case(neg, mix) == 10
     @test div_cc_case(neg, mix) == 10
@@ -282,6 +343,14 @@ div_cc_case(A::MC, B::MC) = div_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv, 
     @test isnan((neg/mix).Intv.lo)
     @test isnan(eval_check(div_hi, neg, mix))
     @test isnan((neg/mix).Intv.hi)
+    @test isnan(eval_check_grad(div_cvgrad[1], neg, mix))
+    @test isnan((neg/mix).cv_grad[1])
+    @test isnan(eval_check_grad(div_cvgrad[2], neg, mix))
+    @test isnan((neg/mix).cv_grad[2])
+    @test isnan(eval_check_grad(div_ccgrad[1], neg, mix))
+    @test isnan((neg/mix).cc_grad[1])
+    @test isnan(eval_check_grad(div_ccgrad[2], neg, mix))
+    @test isnan((neg/mix).cc_grad[2])
 
     @test div_cv_case(mix, pos_lo) == 11
     @test div_cc_case(mix, pos_lo) == 11
@@ -289,6 +358,10 @@ div_cc_case(A::MC, B::MC) = div_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv, 
     @test abs(eval_check(div_cc, mix, pos_lo) - (mix/pos_lo).cc) <= 1E-15
     @test abs(eval_check(div_lo, mix, pos_lo) - (mix/pos_lo).Intv.lo) <= 1E-15
     @test abs(eval_check(div_hi, mix, pos_lo) - (mix/pos_lo).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad(div_cvgrad[1], mix, pos_lo) - (mix/pos_lo).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(div_cvgrad[2], mix, pos_lo) - (mix/pos_lo).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad(div_ccgrad[1], mix, pos_lo) - (mix/pos_lo).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(div_ccgrad[2], mix, pos_lo) - (mix/pos_lo).cc_grad[2]) <= 1E-15
     
     @test div_cv_case(mix, pos) == 12
     @test div_cc_case(mix, pos) == 12
@@ -296,6 +369,10 @@ div_cc_case(A::MC, B::MC) = div_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv, 
     @test abs(eval_check(div_cc, mix, pos) - (mix/pos).cc) <= 1E-15
     @test abs(eval_check(div_lo, mix, pos) - (mix/pos).Intv.lo) <= 1E-15
     @test abs(eval_check(div_hi, mix, pos) - (mix/pos).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad(div_cvgrad[1], mix, pos) - (mix/pos).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(div_cvgrad[2], mix, pos) - (mix/pos).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad(div_ccgrad[1], mix, pos) - (mix/pos).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(div_ccgrad[2], mix, pos) - (mix/pos).cc_grad[2]) <= 1E-15
 
     @test div_cv_case(mix, neg) == 13
     @test div_cc_case(mix, neg) == 13
@@ -303,6 +380,10 @@ div_cc_case(A::MC, B::MC) = div_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv, 
     @test abs(eval_check(div_cc, mix, neg) - (mix/neg).cc) <= 1E-15
     @test abs(eval_check(div_lo, mix, neg) - (mix/neg).Intv.lo) <= 1E-15
     @test abs(eval_check(div_hi, mix, neg) - (mix/neg).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad(div_cvgrad[1], mix, neg) - (mix/neg).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(div_cvgrad[2], mix, neg) - (mix/neg).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad(div_ccgrad[1], mix, neg) - (mix/neg).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(div_ccgrad[2], mix, neg) - (mix/neg).cc_grad[2]) <= 1E-15
 
     @test div_cv_case(mix, neg_lo) == 14
     @test div_cc_case(mix, neg_lo) == 14
@@ -310,6 +391,10 @@ div_cc_case(A::MC, B::MC) = div_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv, 
     @test abs(eval_check(div_cc, mix, neg_lo) - (mix/neg_lo).cc) <= 1E-15
     @test abs(eval_check(div_lo, mix, neg_lo) - (mix/neg_lo).Intv.lo) <= 1E-15
     @test abs(eval_check(div_hi, mix, neg_lo) - (mix/neg_lo).Intv.hi) <= 1E-15
+    @test abs(eval_check_grad(div_cvgrad[1], mix, neg_lo) - (mix/neg_lo).cv_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(div_cvgrad[2], mix, neg_lo) - (mix/neg_lo).cv_grad[2]) <= 1E-15
+    @test abs(eval_check_grad(div_ccgrad[1], mix, neg_lo) - (mix/neg_lo).cc_grad[1]) <= 1E-15
+    @test abs(eval_check_grad(div_ccgrad[2], mix, neg_lo) - (mix/neg_lo).cc_grad[2]) <= 1E-15
     
     @test div_cv_case(mix, mix) == 15
     @test div_cc_case(mix, mix) == 15
@@ -321,4 +406,12 @@ div_cc_case(A::MC, B::MC) = div_cv_case(A.cv, A.cc, A.Intv.lo, A.Intv.hi, B.cv, 
     @test isnan((mix/mix).Intv.lo)
     @test isnan(eval_check(div_hi, mix, mix))
     @test isnan((mix/mix).Intv.hi)
+    @test isnan(eval_check_grad(div_cvgrad[1], mix, mix))
+    @test isnan((mix/mix).cv_grad[1])
+    @test isnan(eval_check_grad(div_cvgrad[2], mix, mix))
+    @test isnan((mix/mix).cv_grad[2])
+    @test isnan(eval_check_grad(div_ccgrad[1], mix, mix))
+    @test isnan((mix/mix).cc_grad[1])
+    @test isnan(eval_check_grad(div_ccgrad[2], mix, mix))
+    @test isnan((mix/mix).cc_grad[2])
 end

@@ -220,7 +220,10 @@ end
     pull_vars(::Vector{Equation})
 
 Pull out all variables/symbols from an expression or the RHS of an
-equation (or RHSs of a set of equations), and sort them alphabetically.
+equation (or RHSs of a set of equations), and sort them. Variables
+are sorted alphabetically, then in the order [cv, cc, L, U], then
+followed by the terms for the subgradient of the convex relaxation
+and terms for  the subgradient of the concave relaxation.
 
 # Example
 
@@ -404,8 +407,8 @@ function _pull_vars(term::BasicSymbolic, vars::Vector{Num}, strings::Vector{Stri
         return vars, strings
     end
     if exprtype(term)==TERM && varterm(term)
-        if ~(string(term.f) in strings) || (term.f==getindex && ~(string(term) in string.(vars)))
-            push!(strings, string(term.f))
+        if ~(string(term.f) in strings) && (term.f==getindex && ~(string(term) in string.(vars)))
+            push!(strings, string(term))
             push!(vars, term)
             return vars, strings
         end
@@ -430,6 +433,8 @@ function _pull_vars(term::BasicSymbolic, vars::Vector{Num}, strings::Vector{Stri
     end
     return vars, strings
 end
+# _pull_vars(term, vars::Vector{Num}, strings::Vector{String}) = vars, strings
+
 
 
 """
@@ -467,6 +472,7 @@ function shrink_eqs(eqs::Vector{Equation}, keep::Int64=4; force::Bool=false)
         new_eqs[replace] = substitute(new_eqs[replace], Dict(new_eqs[1].lhs => new_eqs[1].rhs))
         new_eqs = new_eqs[2:end]
     end
+    # Need to add in the final shrinking for the cut.
     return new_eqs
 end
 

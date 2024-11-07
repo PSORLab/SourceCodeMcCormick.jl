@@ -1,6 +1,7 @@
 include(joinpath(@__DIR__, "utilities.jl"))
 include(joinpath(@__DIR__, "binarize.jl"))
 include(joinpath(@__DIR__, "factor.jl"))
+include(joinpath(@__DIR__, "write.jl"))
 
 
 # function apply_transform(transform::T, prob::ODESystem; constants::Vector{Num}=Num[]) where T<:AbstractTransform

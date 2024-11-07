@@ -44,20 +44,39 @@ end
 #=
 Binary Rules
 =#
+# Alternative multiplication rule from Ye2023. Note that the cut operator is applied at the beginning,
+# to the inputs of the transform rule.
+# function transform_rule(::McCormickTransform, ::typeof(+), zL, zU, zcv, zcc, xL, xU, xcv, xcc, yL, yU, ycv, ycc)
+#     cut_xcv = max(xL, xcv)
+#     cut_xcc = min(xU, xcc)
+#     cut_ycv = max(yL, ycv)
+#     cut_ycc = min(yU, ycc)
+#     rcv = Equation(zcv, cut_xcv + cut_ycv)
+#     rcc = Equation(zcc, cut_xcc + cut_ycc)
+#     return rcv, rcc
+# end
 function transform_rule(::McCormickTransform, ::typeof(+), zL, zU, zcv, zcc, xL, xU, xcv, xcc, yL, yU, ycv, ycc)
     rcv = Equation(zcv, xcv + ycv)
     rcc = Equation(zcc, xcc + ycc)
     return rcv, rcc
 end
 
-
 # Rules for multiplication adapted from:
 # https://github.com/PSORLab/McCormick.jl/blob/master/src/forward_operators/multiplication.jl
+# TODO: Add in "cut" function from McCormick.jl
 function transform_rule(::McCormickTransform, ::typeof(*), zL, zU, zcv, zcc, xL, xU, xcv, xcc, yL::Real, yU::Real, ycv::Real, ycc::Real)
     rcv = Equation(zcv, IfElse.ifelse(yL >= 0.0, ycv*xcv, ycc*xcc))
     rcc = Equation(zcc, IfElse.ifelse(yL >= 0.0, ycc*xcc, ycv*xcv))
     return rcv, rcc
 end
+# Alternative multiplication rule from Ye2023. Note that the cut operator is not applied at the end.
+# function transform_rule(::McCormickTransform, ::typeof(*), zL, zU, zcv, zcc, xL, xU, xcv, xcc, yL, yU, ycv, ycc)
+#     rcv = Equation(zcv, max(psi_cv(yL, max(xL, xcv), min(xU, xcc)) + psi_cv(xL, max(yL, ycv), min(yU, ycc)) - xL*yL,
+#                             psi_cv(yU, max(xL, xcv), min(xU, xcc)) + psi_cv(xU, max(yL, ycv), min(yU, ycc)) - xU*yU))
+#     rcc = Equation(zcc, min(psi_cc(yL, max(xL, xcv), min(xU, xcc)) + psi_cc(xU, max(yL, ycv), min(yU, ycc)) - xU*yL,
+#                             psi_cc(yU, max(xL, xcv), min(xU, xcc)) + psi_cc(xL, max(yL, ycv), min(yU, ycc)) - xL*yU))
+#     return rcv, rcc
+# end
 function transform_rule(::McCormickTransform, ::typeof(*), zL, zU, zcv, zcc, xL, xU, xcv, xcc, yL, yU, ycv, ycc)
     rcv = Equation(zcv, max(zL, IfElse.ifelse(xL >= 0.0,
         IfElse.ifelse(yL >= 0.0, max(yU*xcv + xU*ycv - xU*yU, yL*xcv + xL*ycv - xL*yL),
@@ -107,6 +126,9 @@ function transform_rule(::McCormickTransform, ::typeof(*), zL, zU, zcv, zcc, xL,
     # # and then swap and negate cv/cc
     # cv = -min((-yU)*xcc + xU*(-ycv) - xU*(-yU), (-yL)*xcc + xU*(-ycv) - xL*(-yL))
     # cc = -max((-yL)*xcv + xU*(-ycc) - xU*(-yL), (-yU)*xcv + xL*(-ycc) - xL*(-yU))
+
+    
+    # cv = -min((-yU)*xcc + xU*(-ycv) - xU*(-yU), (-yL)*xcc + xL*(-ycv) - xL*(-yL)) #typo fixed
 
 
     # # [x+,ym]
@@ -276,3 +298,4 @@ end
 TODO: Add other operators. It's probably helpful to break the McCormick overload and McCormick + Interval Outputs
 into separate transform_rules since the coupling for the ODEs are one directional and potentially useful.
 =#
+

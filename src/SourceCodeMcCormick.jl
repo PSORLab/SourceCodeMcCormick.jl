@@ -44,10 +44,15 @@ function transform_rule end
 include(joinpath(@__DIR__, "interval", "interval.jl"))
 include(joinpath(@__DIR__, "relaxation", "relaxation.jl"))
 include(joinpath(@__DIR__, "transform", "transform.jl"))
+include(joinpath(@__DIR__, "grad", "grad.jl"))
 
 export McCormickIntervalTransform, IntervalTransform
 
 export apply_transform, all_evaluators, convex_evaluator, extract_terms, 
-        genvar, genparam, get_name, factor, binarize!, pull_vars, shrink_eqs
+        genvar, genparam, get_name, factor, binarize!, pull_vars, shrink_eqs,
+        grad, shrink_grad!, convex_subgradient, all_subgradients, grad_transform!, 
+        levels, eqn_edges, eval_generator, grad_eval_generator, fgen_cv, fgen_cvgrad,
+        fgen, fgen2
+export @variables, Num
         
 end
