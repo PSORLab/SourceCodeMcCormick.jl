@@ -456,13 +456,13 @@ SourceCodeMcCormick generated functions, we can make use of the massive parallel
 available using GPUs.
 
 ```julia
-using JuMP, EAGO, SourceCodeMcCormick, CUDA
+using JuMP, EAGO, SourceCodeMcCormick, Symbolics, DocStringExtensions CUDA
 
-# Import the ParBB algorithm (Note: path may vary depending on where
-# this file is in relation to SourceCodeMcCormick)
-include(joinpath(@__DIR__, "ParBB", "extension.jl"))
-include(joinpath(@__DIR__, "ParBB", "subroutines.jl"))
-include(joinpath(@__DIR__, "ParBB", "kernels.jl"))
+# Import the ParBB algorithm
+BASE_FOLDER = dirname(dirname(pathof(SourceCodeMcCormick)))
+include(joinpath(BASE_FOLDER, "examples", "ParBB", "extension.jl"))
+include(joinpath(BASE_FOLDER, "examples", "ParBB", "subroutines.jl"))
+include(joinpath(BASE_FOLDER, "examples", "ParBB", "kernels.jl"))
 
 # Weights associated with the hidden layer
 W1 = [ 0.54  -1.97  0.09  -2.14  1.01  -0.58  0.45  0.26;
@@ -595,13 +595,13 @@ implementation. The following shows how SourceCodeMcCormick's new subgradient fe
 with ParBB.
 
 ```julia
-using JuMP, EAGO, SourceCodeMcCormick, CUDA
+using JuMP, EAGO, SourceCodeMcCormick, Symbolics, DocStringExtensions, CUDA
 
-# Import the ParBB algorithm (Note: path may vary depending on where
-# this file is in relation to SourceCodeMcCormick)
-include(joinpath(@__DIR__, "ParBB", "extension.jl"))
-include(joinpath(@__DIR__, "ParBB", "subroutines.jl"))
-include(joinpath(@__DIR__, "ParBB", "kernels.jl"))
+# Import the ParBB algorithm
+BASE_FOLDER = dirname(dirname(pathof(SourceCodeMcCormick)))
+include(joinpath(BASE_FOLDER, "examples", "ParBB", "extension.jl"))
+include(joinpath(BASE_FOLDER, "examples", "ParBB", "subroutines.jl"))
+include(joinpath(BASE_FOLDER, "examples", "ParBB", "kernels.jl"))
 
 # Weights associated with the hidden layer
 W1 = [ 0.54  -1.97  0.09  -2.14  1.01  -0.58  0.45  0.26;
