@@ -31,8 +31,7 @@ function solve_gpu!(m::EAGO.GlobalOptimizer)
     # Identify the extension
     ext = EAGO._ext(m)
 
-    # Set counts to 1
-    m._iteration_count = 1
+    # Set node count to 1
     m._node_count = 1
 
     # Prepare to run branch-and-bound
@@ -54,6 +53,9 @@ function solve_gpu!(m::EAGO.GlobalOptimizer)
     # Run branch and bound; terminate when the stack is empty or when some
     # tolerance or limit is hit
     while !EAGO.termination_check(m)
+
+        # Update iteration counter
+        m._iteration_count += 1
         
         # Garbage collect every gc_freq iterations
         if mod(m._iteration_count, EAGO._ext(m).gc_freq)==0
@@ -105,7 +107,6 @@ function solve_gpu!(m::EAGO.GlobalOptimizer)
         m._time_left = m._parameters.time_limit - m._run_time
         EAGO.log_iteration!(m)
         EAGO.print_iteration!(m, false)
-        m._iteration_count += 1
     end
     EAGO.print_iteration!(m, true)
 

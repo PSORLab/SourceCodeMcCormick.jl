@@ -1,7 +1,8 @@
 
 module SourceCodeMcCormick
 
-using Symbolics
+using Reexport
+@reexport using Symbolics
 using SymbolicUtils.Code
 using IfElse
 using DocStringExtensions
@@ -51,8 +52,6 @@ export McCormickIntervalTransform, IntervalTransform
 export apply_transform, all_evaluators, convex_evaluator, extract_terms, 
         genvar, genparam, get_name, factor, binarize!, pull_vars, shrink_eqs,
         grad, shrink_grad!, convex_subgradient, all_subgradients, grad_transform!, 
-        levels, eqn_edges, eval_generator, grad_eval_generator, fgen_cv, fgen_cvgrad,
-        fgen, fgen2
-export @variables, Num
+        levels, eqn_edges, eval_generator, grad_eval_generator, fgen
         
 end
