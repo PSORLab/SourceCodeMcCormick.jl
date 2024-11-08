@@ -524,15 +524,15 @@ Running this code (after an initial compilation run) generates the following out
 ---------------------------------------------------------------------------------------------------------------------------------
 |  Iteration #  |     Nodes     |  Lower Bound  |  Upper Bound  |      Gap      |     Ratio     |     Timer     |   Time Left   |
 ---------------------------------------------------------------------------------------------------------------------------------
-|            10 |         47818 |    -8.337E-01 |    -7.048E-01 |     1.289E-01 |     1.546E-01 |          0.74 |       3599.26 |
-|            20 |        117316 |    -7.703E-01 |    -7.048E-01 |     6.549E-02 |     8.503E-02 |          1.47 |       3598.53 |
-|            30 |        162052 |    -7.608E-01 |    -7.048E-01 |     5.604E-02 |     7.365E-02 |          1.90 |       3598.10 |
-|            40 |        177018 |    -7.473E-01 |    -7.048E-01 |     4.254E-02 |     5.693E-02 |          2.38 |       3597.62 |
-|            50 |        161712 |    -7.411E-01 |    -7.048E-01 |     3.632E-02 |     4.901E-02 |          3.24 |       3596.76 |
-|            60 |        128062 |    -7.293E-01 |    -7.048E-01 |     2.453E-02 |     3.363E-02 |          4.10 |       3595.90 |
-|            70 |         73936 |    -7.211E-01 |    -7.048E-01 |     1.631E-02 |     2.262E-02 |          5.03 |       3594.97 |
-|            80 |         11916 |    -7.180E-01 |    -7.048E-01 |     1.321E-02 |     1.841E-02 |          5.59 |       3594.41 |
-|            83 |          4560 |    -7.051E-01 |    -7.048E-01 |     3.648E-04 |     5.173E-04 |          5.64 |       3594.36 |
+|            10 |         47818 |    -8.337E-01 |    -7.048E-01 |     1.289E-01 |     1.546E-01 |          0.47 |       3599.53 |
+|            20 |        117316 |    -7.703E-01 |    -7.048E-01 |     6.549E-02 |     8.503E-02 |          0.83 |       3599.17 |
+|            30 |        162052 |    -7.608E-01 |    -7.048E-01 |     5.604E-02 |     7.365E-02 |          1.26 |       3598.74 |
+|            40 |        177018 |    -7.473E-01 |    -7.048E-01 |     4.254E-02 |     5.693E-02 |          1.74 |       3598.26 |
+|            50 |        161712 |    -7.411E-01 |    -7.048E-01 |     3.632E-02 |     4.901E-02 |          2.62 |       3597.38 |
+|            60 |        128062 |    -7.293E-01 |    -7.048E-01 |     2.453E-02 |     3.363E-02 |          3.17 |       3596.83 |
+|            70 |         73936 |    -7.211E-01 |    -7.048E-01 |     1.631E-02 |     2.262E-02 |          3.76 |       3596.24 |
+|            80 |         11916 |    -7.180E-01 |    -7.048E-01 |     1.321E-02 |     1.841E-02 |          4.36 |       3595.64 |
+|            82 |          4560 |    -7.051E-01 |    -7.048E-01 |     3.648E-04 |     5.173E-04 |          4.42 |       3595.58 |
 ---------------------------------------------------------------------------------------------------------------------------------
 
 Relative Tolerance Achieved
@@ -550,13 +550,13 @@ Solution:
    p[8] = 0.9999999998842802
 ```
 
-Using the subgradient-free method, and processing 8192 nodes per iteration, this problem converged in 83
-iterations (roughly 679,936 nodes explored), with a total time of 5.64 seconds. These times were obtained
+Using the subgradient-free method, and processing 8192 nodes per iteration, this problem converged in 82
+iterations (roughly 671,744 nodes explored), with a total time of 4.42 seconds. These times were obtained
 on a workstation with an Intel i7-9850H processor and an NVIDIA Quadro T2000 GPU. Using a GPU with a
 greater capacity for double-precision floating point calculations will, of course, improve the overall 
 performance of the algorithm, but even with a fairly "typical" GPU such as this, relatively competitive
 speed can be obtained. As compared to the base version of EAGO (which makes use of subgradients), this
-example ran roughly 9x faster. 
+example ran roughly 11x faster. 
 
 It is also important to note that, because a subgradient-free method was used, the lower bounds for any
 individual branch-and-bound node are not as tight as those that can be obtained using subgradient-based
@@ -662,16 +662,15 @@ Running this code (after an initial compilation run) generates the following out
 ---------------------------------------------------------------------------------------------------------------------------------
 |  Iteration #  |     Nodes     |  Lower Bound  |  Upper Bound  |      Gap      |     Ratio     |     Timer     |   Time Left   |
 ---------------------------------------------------------------------------------------------------------------------------------
-|            10 |         16280 |    -7.754E-01 |    -7.048E-01 |     7.067E-02 |     9.113E-02 |          0.59 |       3599.41 |
-|            20 |         59342 |    -7.353E-01 |    -7.048E-01 |     3.055E-02 |     4.154E-02 |          1.16 |       3598.84 |
-|            30 |         46048 |    -7.108E-01 |    -7.048E-01 |     5.983E-03 |     8.418E-03 |          1.82 |       3598.18 |
-|            40 |          2240 |    -7.058E-01 |    -7.048E-01 |     9.852E-04 |     1.396E-03 |          2.30 |       3597.70 |
-|            41 |          2240 |    -7.058E-01 |    -7.048E-01 |     9.852E-04 |     1.396E-03 |          2.30 |       3597.70 |
+|            10 |         16280 |    -7.754E-01 |    -7.048E-01 |     7.067E-02 |     9.113E-02 |          0.45 |       3599.55 |
+|            20 |         59342 |    -7.353E-01 |    -7.048E-01 |     3.055E-02 |     4.154E-02 |          1.09 |       3598.91 |
+|            30 |         46048 |    -7.108E-01 |    -7.048E-01 |     5.983E-03 |     8.418E-03 |          1.85 |       3598.15 |
+|            40 |          2240 |    -7.058E-01 |    -7.048E-01 |     9.852E-04 |     1.396E-03 |          2.33 |       3597.67 |
 ---------------------------------------------------------------------------------------------------------------------------------
 
 Absolute Tolerance Achieved
 Optimal Solution Found at Node 1
-Lower Bound: -0.7057619894307734
+Lower Bound: -0.7057619894307733
 Upper Bound: -0.7047768067379733
 Solution:
    p[1] = -0.9999999998903418
@@ -688,7 +687,7 @@ As in the previous examples, these results were generated using an Intel i7-9850
 Quadro T2000 GPU. Effectively, ParBB is running precisely the same lower-bounding routine as the base
 version of the global solver EAGO, except that the routine is being performed in parallel on a GPU
 rather than serially on the CPU. This example converges in 40 iterations of at most 8192 nodes per iteration,
-for a total of roughly 327,680 nodes explored, and reaches its solution in 2.30 seconds. As compared to the
+for a total of roughly 327,680 nodes explored, and reaches its solution in 2.33 seconds. As compared to the
 base version of EAGO, this implementation of ParBB solves the problem roughly 22x faster. As in the previous
 subsection, it should be noted that a GPU with better double-precision floating-point calculation throughput
 would yield even faster results.
