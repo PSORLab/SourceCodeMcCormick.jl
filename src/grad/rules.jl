@@ -272,7 +272,7 @@ function grad_transform!(::McCormickIntervalTransform, ::typeof(/), zL, zU, zcv,
             IfElse.ifelse(yU < 0.0, mid_expr(ycc, ycv, yU).^(-1),
                 NaN))
     y_cv_gradlist_inv = similar(cv_gradlist[:,y])
-    @. y_cv_gradlist_inv = IfElse.ifelse(yU < 0.0, IfElse.ifelse(yU == yL, -1/(mid_expr(ycc, ycv, yL)*mid_expr(ycc, ycv, yL)), (yU^-1 - yL^-1)/(yU - yL)) * 
+    @. y_cv_gradlist_inv = IfElse.ifelse(yU < 0.0, IfElse.ifelse(yU == yL, -1/(mid_expr(ycc, ycv, yL)*mid_expr(ycc, ycv, yL)) * mid_grad(ycc, ycv, yL, cc_gradlist[:,y], cv_gradlist[:,y], zero_vec), (yU^-1 - yL^-1)/(yU - yL)) * 
                 mid_grad(ycc, ycv, yL, cc_gradlist[:,y], cv_gradlist[:,y], zero_vec),
         IfElse.ifelse(yL > 0.0, -1.0/(mid_expr(ycc, ycv, yU)*mid_expr(ycc, ycv, yU)) * 
                 mid_grad(ycc, ycv, yU, cc_gradlist[:,y], cv_gradlist[:,y], zero_vec),

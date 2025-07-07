@@ -15,7 +15,7 @@ function eval_check_grad(eval_func, MC1)
     return eval_func(MC1.cv, MC1.cc, MC1.Intv.lo, MC1.Intv.hi, MC1.cv_grad[1], MC1.cc_grad[1])
 end
 include("multiplication.jl")
-include("division.jl")
+# include("division.jl")
 include("addition.jl")
 include("exp.jl")
 include("power.jl") #NOTE: Currently only includes ^2

@@ -57,6 +57,8 @@ end
     get_name
 
 Take a `BasicSymbolic` object such as `x[1,1]` and return a symbol like `:xv1v1`.
+Note that this supports up to 9999-indexed variables (higher than that will still
+work, but the order will be wrong)
 """
 function get_name(a::BasicSymbolic)
     if exprtype(a)==SYM
@@ -67,7 +69,18 @@ function get_name(a::BasicSymbolic)
                 args = a.arguments
                 new_var = string(args[1])
                 for i in 2:lastindex(args)
-                    new_var = new_var * "v" * string(args[i])
+                    if args[i] < 10
+                        new_var = new_var * "v000" * string(args[i])
+                    elseif args[i] < 100
+                        new_var = new_var * "v00" * string(args[i])
+                    elseif args[i] < 1000
+                        new_var = new_var * "v0" * string(args[i])
+                    elseif args[i] < 10000
+                        new_var = new_var * "v" * string(args[i])
+                    else
+                        @warn "Index above 10000, order may be wrong"
+                        new_var = new_var * "v" * string(args[i])
+                    end
                 end
                 return Symbol(new_var)
             else
