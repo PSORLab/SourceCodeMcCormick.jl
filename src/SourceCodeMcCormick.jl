@@ -8,6 +8,7 @@ using IfElse
 using DocStringExtensions
 using Graphs
 using CUDA
+using StaticArrays: @MVector
 import Dates
 import SymbolicUtils: BasicSymbolic, exprtype, SYM, TERM, ADD, MUL, POW, DIV
 
@@ -46,12 +47,21 @@ include(joinpath(@__DIR__, "interval", "interval.jl"))
 include(joinpath(@__DIR__, "relaxation", "relaxation.jl"))
 include(joinpath(@__DIR__, "transform", "transform.jl"))
 include(joinpath(@__DIR__, "grad", "grad.jl"))
+include(joinpath(@__DIR__, "kernel_writer", "kernel_write.jl"))
+include(joinpath(@__DIR__, "precompile.jl"))
+_precompile_()
 
 export McCormickIntervalTransform, IntervalTransform
 
 export apply_transform, all_evaluators, convex_evaluator, extract_terms, 
         genvar, genparam, get_name, factor, binarize!, pull_vars, shrink_eqs,
         grad, shrink_grad!, convex_subgradient, all_subgradients, grad_transform!, 
-        levels, eqn_edges, eval_generator, grad_eval_generator, fgen
+        levels, eqn_edges, eval_generator, grad_eval_generator, fgen, kgen,
+        perform_substitutions
+
+# export individual kernels
+export SCMC_cadd_kernel, SCMC_add_to_kernel, SCMC_negate_kernel, SCMC_exp_kernel,
+        SCMC_log_kernel, SCMC_inv_kernel, SCMC_cmul_kernel, SCMC_sigmoid_kernel,
+        SCMC_mult_kernel, SCMC_add_kernel
         
 end
