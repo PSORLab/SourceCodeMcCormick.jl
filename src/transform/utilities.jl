@@ -290,18 +290,34 @@ end
 function sort_vars(strings::Vector{String})
     # isempty(strings) && return
     sort_names = fill("", length(strings))
-    
+
     # Step 1) Check for derivative-type variables
     # @show strings
     # split_strings = string.(hcat(split.(strings, "_")...)[1,:])
     split_strings = first.(split.(strings, "_"))
     if strings == split_strings
+        # Simpler case; we can sort more-or-less normally
+
+        # Put constants first, if any exist
         for i in eachindex(split_strings)
             if split_strings[i]=="constant"
                 split_strings[i] = "_____constant"
             end
         end
-        return sortperm(split_strings)
+
+        # Sort split_strings, and if the strings follow the pattern [letters][numbers], 
+        # sort by [letters] first and then by [numbers]. Otherwise, treat the string
+        # just as a normal string
+        return sortperm(split_strings, by = s -> begin
+                m = match(r"([a-zA-Z]+)(\d+)", s)
+                if m !== nothing
+                    prefix = m.captures[1]
+                    number = parse(Int, m.captures[2])
+                    return (prefix, number)
+                else
+                    return (s, 0)
+                end
+            end)
     end
     deriv = fill(false, length(strings))
     # Here's a way to check for derivatives if we need to go back to "d" instead of '∂'
@@ -399,8 +415,8 @@ end
 
 function _pull_vars(term::BasicSymbolic, vars::Vector{Num}, strings::Vector{String})
     if exprtype(term)==SYM
-        if ~(string(term) in strings)
-            push!(strings, string(term))
+        if ~(string(get_name(term)) in strings)
+            push!(strings, string(get_name(term)))
             push!(vars, term)
             return vars, strings
         end
@@ -408,7 +424,7 @@ function _pull_vars(term::BasicSymbolic, vars::Vector{Num}, strings::Vector{Stri
     end
     if exprtype(term)==TERM && varterm(term)
         if ~(string(term.f) in strings) && (term.f==getindex && ~(string(term) in string.(vars)))
-            push!(strings, string(term))
+            push!(strings, string(get_name(term)))
             push!(vars, term)
             return vars, strings
         end
@@ -421,8 +437,8 @@ function _pull_vars(term::BasicSymbolic, vars::Vector{Num}, strings::Vector{Stri
         end
         ~(typeof(arg)<:BasicSymbolic) ? continue : nothing
         if exprtype(arg)==SYM
-            if ~(string(arg) in strings)
-                push!(strings, string(arg))
+            if ~(string(get_name(arg)) in strings)
+                push!(strings, string(get_name(arg)))
                 push!(vars, arg)
             end
         elseif typeof(arg) <: Real
@@ -450,8 +466,8 @@ number of equations remaining (default = 4).
 ```
 eqs = [y ~ 15*x,
        z ~ (1+y)^2]
-shrink_eqs(eqs, 1)
 
+julia> shrink_eqs(eqs, 1)
 1-element Vector{Equation}:
  z ~ (1 + 15x)^2
 ```
@@ -474,6 +490,47 @@ function shrink_eqs(eqs::Vector{Equation}, keep::Int64=4; force::Bool=false)
     end
     # Need to add in the final shrinking for the cut.
     return new_eqs
+end
+
+"""
+    extract(::Vector{Equation})
+    extract(::Vector{Equation}, ::Int)
+
+Given a set of symbolic equations, and optinally a specific
+element that you would like expanded into a full expression,
+progressively substitute the RHS definitions of LHS terms 
+until there is only that equation remaining (default = end).
+Returns the RHS of that expression as an object of type
+SymbolicUtils.BasicSymbolic{Real}.
+
+# Example
+
+```
+eqs = [y ~ 15*x,
+   z ~ (1+y)^2]
+
+julia> extract(eqs)
+(1 + 15x)^2
+```
+"""
+function extract(eqs::Vector{Equation}, ID::Int=length(eqs))
+    final_expr = eqs[ID].rhs
+    progress = true
+    while progress
+        progress = false
+        for var in pull_vars(final_expr)
+            eq_ID = findfirst(x -> isequal(x.lhs, var), eqs)
+            if !isnothing(eq_ID)
+                if isequal(eqs[eq_ID].lhs, eqs[eq_ID].rhs)
+                    nothing
+                else
+                    final_expr = substitute(final_expr, Dict(eqs[eq_ID].lhs => eqs[eq_ID].rhs))
+                    progress = true
+                end
+            end
+        end
+    end
+    return final_expr
 end
 
 """

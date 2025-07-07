@@ -35,3 +35,4 @@ function binarize!(ex::BasicSymbolic)
         return nothing
     end
 end
+binarize!(a::Real) = error("Attempting to apply binarize!() to a Real")

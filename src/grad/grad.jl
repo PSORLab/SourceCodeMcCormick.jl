@@ -1,6 +1,37 @@
 
-# Can remove the import statement once this is fully incorporated into SCMC
-# import SourceCodeMcCormick: xstr, ystr, zstr, var_names, arity, op, transform_rule
+struct GradTransform <: AbstractTransform end
+
+var_names(::GradTransform, a::Real) = a, a
+function var_names(::GradTransform, a::BasicSymbolic)
+    if exprtype(a)==SYM
+        acvgrad = genvar(Symbol(string(get_name(a))*"_cvgrad"))
+        accgrad = genvar(Symbol(string(get_name(a))*"_ccgrad"))
+        return acvgrad.val, accgrad.val
+    elseif exprtype(a)==TERM
+        if varterm(a) && typeof(a.f)<:BasicSymbolic
+            arg_list = Symbol[]
+            for i in a.arguments
+                push!(arg_list, get_name(i))
+            end
+            acvgrad = genvar(Symbol(string(get_name(a))*"_cvgrad"), arg_list)
+            accgrad = genvar(Symbol(string(get_name(a))*"_ccgrad"), arg_list)
+            return acvgrad.val, accgrad.val
+        else
+            acvgrad = genvar(Symbol(string(get_name(a))*"_cvgrad"))
+            accgrad = genvar(Symbol(string(get_name(a))*"_ccgrad"))
+            return acvgrad.val, accgrad.val
+        end
+    else
+        error("Reached `var_names` with an unexpected type [ADD/MUL/DIV/POW]. Check expression factorization to make sure it is being binarized correctly.")
+    end
+end
+
+function all_names(a::Any)
+    aL, aU = var_names(IntervalTransform(), a)
+    acv, acc = var_names(McCormickTransform(), a)
+    acvgrad, accgrad = var_names(GradTransform(), a)
+    return aL, aU, acv, acc, acvgrad, accgrad
+end
 
 
 """

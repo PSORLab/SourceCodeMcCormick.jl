@@ -85,7 +85,11 @@ function eqn_edges(a::Vector{Equation})
     LHS = hcat(pre_LHS...)
     LHS_id = zeros(Int, size(LHS))
     for i in eachindex(LHS_id)
-        LHS_id[i] = varid[LHS[i]]
+        if haskey(varid, LHS[i])
+            LHS_id[i] = varid[LHS[i]]
+        else
+            LHS_id[i] = 0
+        end
     end
 
     RHS_vars = pull_vars.(a)
@@ -718,9 +722,6 @@ function fgen(num::Num, gradlist::Vector{Num}, raw_outputs::Vector{Symbol}, path
         if (varorder[i] in string.(vars)) # Skip the variable if it's an input (i.e., we don't need to make an auxiliary variable for it)
             continue
         end
-        if mutate && (i==length(varorder)) # If we're mutating, don't make a temporary variable for the final entry in varorder
-            break
-        end
         ID = findfirst(x -> occursin(varorder[i], x), varids)
         tempID = 0
         if isempty(temp_endlist)
@@ -806,7 +807,7 @@ function fgen(num::Num, gradlist::Vector{Num}, raw_outputs::Vector{Symbol}, path
                     end
                 end
             end
-        else
+        elseif mutate==false
             if :cv in outputs
                 write(loc, "   temp$(maxtemp)_cv = similar($(representative))\n")
                 if loc==file_kernel
@@ -1071,7 +1072,7 @@ function fgen(num::Num, gradlist::Vector{Num}, raw_outputs::Vector{Symbol}, path
                     if :ccgrad in outputs
                         for j in eachindex(dsym_cc)
                             outvar = string(get_name.(gradlist)[j])
-                            write(loc, "   OUT_∂$(outvar)_cv $(eq) $(funcs[func_num][6])[1].($(grad_input[j]))\n")
+                            write(loc, "   OUT_∂$(outvar)_cc $(eq) $(funcs[func_num][6])[1].($(grad_input[j]))\n")
                         end
                     end
                 end
