@@ -5,6 +5,320 @@
 | [![](https://img.shields.io/badge/Developed_by-PSOR_Lab-342674)](https://psor.uconn.edu/) | [![Build Status](https://github.com/PSORLab/SourceCodeMcCormick.jl/workflows/CI/badge.svg?branch=master)](https://github.com/PSORLab/SourceCodeMcCormick.jl/actions?query=workflow%3ACI) [![codecov](https://codecov.io/gh/PSORLab/SourceCodeMcCormick.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/PSORLab/SourceCodeMcCormick.jl)|
 
 
+This package uses source-code generation to create CUDA kernels that return evaluations of McCormick-based
+relaxations. Expressions composed of `Symbolics.jl`-type variables can be passed into the main `SourceCodeMcCormick.jl`
+(`SCMC`) function, `kgen`, after which the expressions are factored, algebraic rearrangements and other
+modifications are applied as necessary, and a new, custom function is written that calculates inclusion
+monotonic interval extensions, convex and concave relaxations, and subgradients of the convex and concave
+relaxations of the original expression. These new custom functions are meant to be used in, e.g., a branch-and-bound
+routine where the optimizer would like to calculate relaxations for many nodes simultaneously using GPU 
+resources. They are designed to be used with `CUDA.CuArray{Float64}` objects, with 64-bit (double-precision)
+numbers recommended to maintain accuracy.
+
+
+## Basic Functionality
+
+The primary user-facing function is `kgen` ("kernel generator"). The `kgen` function returns a source-code-generated
+function that provides evaluations of convex and concave relaxations, inclusion monotonic interval extensions,
+convex relaxation subgradients, and concave relaxation subgradients, for an input symbolic expression. Inputs
+to the newly generated function are expected to be an output placeholder, followed by a separate `CuArray` for
+each input variable, sorted in alphabetical order. The "input" variables must be `(m,3)`-dimensional `CuArray`s,
+with the columns corresponding to points where evaluations are requested, lower bounds, and upper bounds,
+respectively. The "output" placeholder must be `(m,4+2n)`-dimensional, where `n` is the dimensionality of the
+expression. The columns will hold, respectively, the convex and concave relaxations, lower and upper bounds of
+an interval extension, a subgradient of the convex relaxation, and a subgradient of the concave relaxation. 
+Each row `m` in the inputs and output are independent of one another, allowing calculations of relaxation information
+at multiple points on (potentially) different domains. A demonstration of how to use `kgen` is shown here,
+with the output compared to the multiple-dispatch-based `McCormick.jl`:
+
+```julia
+using SourceCodeMcCormick, Symbolics, CUDA
+Symbolics.@variables x, y
+expr = exp(x/y) - (x*y^2)/(y+1)
+new_func = kgen(expr)
+x_in = CuArray([1.0 0.5 3.0;])
+y_in = CuArray([0.7 0.1 2.0;])
+OUT = CUDA.zeros(Float64, 1, 8)
+
+using McCormick
+xMC = MC{2,NS}(1.0, Interval(0.5, 3.0), 1)
+yMC = MC{2,NS}(0.7, Interval(0.1, 2.0), 2)
+
+
+julia> new_func(OUT, x_in, y_in)  # SourceCodeMcCormick.jl
+CUDA.HostKernel for f_3zSdMo7LFdg_1(CuDeviceMatrix{Float64, 1}, CuDeviceMatrix{Float64, 1}, CuDeviceMatrix{Float64, 1})
+
+julia> Array(OUT)
+1×8 Matrix{Float64}:
+ 0.228368  2.96348e12  -9.62507  1.06865e13  -2.32491  -3.62947  3.59209e12  -8.98023e11
+
+julia> exp(xMC/yMC) - (xMC*yMC^2)/(yMC+1)  # McCormick.jl
+MC{2, NS}(0.22836802303235793, 2.963476144457207e12, [-9.62507, 1.06865e+13], [-2.3249068975747305, -3.6294726270892967], [3.592092296310309e12, -8.980230740778097e11], false)
+```
+
+In this example, the symbolic expression `exp(x/y) - (x*y^2)/(y+1)` is passed into `kgen`, which returns the
+function `new_func`. Passing inputs representing the values and domain where calculations are desired for `x` 
+and `y` (i.e., evaluating `x` at `1.0` in the domain `[0.5, 3.0]` and `y` at `0.7` in the domain `[0.1, 2.0]`) 
+into `new_func` returns pointwise evaluations of {cv, cc, lo, hi, [cvgrad]..., [ccgrad]...} for the original
+expression of `exp(x/y) - (x*y^2)/(y+1)` on the specified domain of `x` and `y`.
+
+Evaluating large numbers of points simultaneously using a GPU allows for faster relaxation calculations than 
+evaluating points individually using a CPU. This is demonstrated in the following example:
+
+```julia
+using SourceCodeMcCormick, Symbolics, CUDA, McCormick, BenchmarkTools
+Symbolics.@variables x, y
+expr = exp(x/y) - (x*y^2)/(y+1)
+new_func = kgen(expr)
+
+# CuArray values for SCMC timing
+x_in = hcat(2.5.*CUDA.rand(Float64, 8192) .+ 0.5, 
+            0.5.*CUDA.ones(Float64, 8192), 
+            3.0.*CUDA.ones(Float64, 8192))
+y_in = hcat(1.9.*CUDA.rand(Float64, 8192) .+ 0.1, 
+            0.1.*CUDA.ones(Float64, 8192), 
+            2.0.*CUDA.ones(Float64, 8192))
+OUT = CUDA.zeros(Float64, 8192, 8)
+
+# McCormick objects for McCormick.jl timing
+xMC = MC{2,NS}(1.0, Interval(0.5, 3.0), 1)
+yMC = MC{2,NS}(0.7, Interval(0.1, 2.0), 2)
+
+########################################################
+##### Timing 
+#   CPU: Intel i7-9850H
+#   GPU: NVIDIA Quadro T2000
+
+
+##### McCormick.jl (single evaluation on CPU)
+@btime exp($xMC/$yMC) - ($xMC*$yMC^2)/($yMC+1);
+#   236.941 ns (0 allocations: 0 bytes)
+
+
+##### SourceCodeMcCormick.jl (8192 simultaneous evaluations on GPU)
+@btime new_func($OUT, $x_in, $y_in);
+#   75.700 μs (18 allocations: 384 bytes)
+
+#   Average time per evaluation = 75.700 μs / 8192 = 9.241 ns
+
+
+# Time to move results back to CPU (if needed):
+@btime Array($OUT);
+#   107.200 μs (8 allocations: 512.16 KiB)
+
+# Time including evaluation:
+# 75.700 μs + 107.200 μs = 182.900 μs 
+#   Average time per evaluation = 182.900 μs / 8192 = 22.327 ns
+```
+
+As shown by the two previous examples, functions generated by `kgen` can be significantly faster than
+the same calculations done by `McCormick.jl`, and provide the same information for a given input
+expression. There is a considerable time penalty for bringing the results from device memory (GPU) back
+to host memory (CPU) due to the volume of information generated. If possible, an algorithm designed
+to make use of `SCMC`-generated functions should utilize calculated relaxation information within the
+GPU rather than transfer the information between hardware components.
+
+
+## Arguments for `kgen`
+
+The `kgen` function can be called a `Num`-type expression as an input (as in the examples in the
+previous section), or with several possible arguments that affect `kgen`'s behavior. Some of these
+functionalities and their use cases are shown in this section.
+
+### 1) Overwrite
+
+Functions and kernels created by `kgen` are human-readable and are [currently] saved in the 
+"src\kernel_writer\storage" folder with a title created by hashing the input expression and
+list of relevant variables. By saving the files in this way, calling `kgen` multiple times
+with the same expression in the same Julia session can skip the steps of re-writing and 
+re-compilling the same expression. If the same expression is used across Julia sessions,
+`kgen` can skip the re-writing step and instead compile the existing function and kernels.
+
+In some cases, this behavior may not be desired. For example, if there is an error or interrupt
+during the initial writing of the kernel, or if the source code of `kgen` is being adjusted
+to modify how kernels are written, it is preferable to re-write the kernel from scratch
+rather than rely on the existing generated code. For these cases, the setting `overwrite=true`
+may be used to tell `kgen` to re-write and re-compile the generated code. For example:
+
+```julia
+using SourceCodeMcCormick, Symbolics, CUDA
+Symbolics.@variables x, y
+expr = exp(x/y) - (x*y^2)/(y+1)
+
+# First call with an entirely new expression
+@time new_func = kgen(expr);
+#  3.958299 seconds (3.71 M allocations: 162.940 MiB, 13.60% compilation time)
+
+# Second call in the same Julia session
+@time new_func = kgen(expr);
+#  0.000310 seconds (252 allocations: 10.289 KiB)
+
+# Third call, with a hint for `kgen` to re-write and re-compile
+@time new_func = kgen(expr, overwrite=true);
+#  3.933316 seconds (3.70 M allocations: 162.619 MiB, 13.10% compilation time)
+```
+
+
+### 2) Problem Variables
+
+When using `SCMC` to calculate relaxations for expressions that are components of a larger optimization
+problem (such as individual constraints), it is necessary to provide `kgen` information about all of the
+problem variables. For example, if the objective function in a problem is `x + y + z`, and one constraint
+is `y^2 - z <= 0`, the subgradients of the relaxations for the constraint should be 3-dimensional despite
+the constraint only depending on `y` and `z`. Further, the dimensions must match across expressions such
+that the first subgradient dimension always corresponds to `x`, the second always corresponds to `y`, and
+so on. This is critically important for the primary use case of `SCMC` and is built in to work without
+the need to use a keyword argument. For example:
+
+```julia
+using SourceCodeMcCormick, Symbolics, CUDA
+Symbolics.@variables x, y, z
+obj = x + y + z
+constr1 = y^2 - z
+
+# A valid way to call `kgen`, which is incorrect in this case because the problem
+# variables are {x, y, z}, but `constr1` only depends on {y, z}. 
+constr1_func_A = kgen(constr1)
+
+# The more correct way to call `kgen` in this case, to inform it that the problem 
+# variables are {x, y, z}. 
+constr1_func_B = kgen(constr1, [x, y, z])
+```
+
+In this example, `constr1_func_A` assumes that the only variables are `y` and `z`, and it therefore expects
+the `OUT` storage to be of size `(m,8)` (i.e., each subgradient is 2-dimensional). Because `kgen` is being
+used for one constraint as part of an optimization problem, it is more correct to use `constr1_func_B`,
+which expects `OUT` to be of size `(m,10)` (i.e., each subgradient is 3-dimensional). Note that this
+is directly analogous to the typical use of `McCormick.jl`, where `MC` objects are constructed with the
+larger problem in mind. E.g.:
+
+```julia
+using McCormick
+
+xMC = MC{3,NS}(1.0, Interval(0.0, 2.0), 1)
+yMC = MC{3,NS}(1.5, Interval(1.0, 3.0), 2)
+zMC = MC{3,NS}(1.8, Interval(1.0, 4.0), 3)
+
+obj = xMC + yMC + zMC
+constr1 = yMC^2 - zMC
+```
+
+Here, for the user to calculate `constr1`, they must have already created the `MC` objects `yMC` and `zMC`.
+In the construction of these objects, it was specified that the subgradient would be 3-dimensional (the
+`3` in `MC{3,NS}`), and `yMC` and `zMC` were selected as the second and third dimensions of the subgradient
+by the `2` and `3` that follow the call to `Interval()`. `SCMC` needs the same information; only the
+format is different from `McCormick.jl`. 
+
+Note that if a list of problem variables is not provided, `SCMC` will collect the variables in the 
+expression it's provided and sort them alphabetically, and then numerically. I.e., `x1 < x2 < x10 < y1`. 
+If a variable list is provided, `SCMC` will respect the order of variables in the list without sorting
+them. For example, if `constr1_func_B` were created by calling `kgen(constr1, [z, y, x])`, then
+`constr1_func_B` would expect its input arguments to correspond to `(OUTPUT, z, y, x)` instead of
+the alphabetical `(OUTPUT, x, y, z)`.
+
+
+### 3) Splitting
+
+Internally, `kgen` may split the input expression into multiple subexpressions if the generated kernels
+would be too long. In general, longer kernels are faster but require longer compilation time. The default
+settings attempt to provide a balance of good performance and acceptably low compilation times, but
+situations may arise where a different balance is preferred. The amount of splitting can be modified by
+setting the keyword argument `splitting` to one of `{:low, :default, :high, :max}`, where higher values
+indicate the (internal) creation of more, shorter kernels (faster compilation, slower performance), and lower
+values indicate the (internal) creation of fewer, longer kernels (longer compilation, faster performance). 
+Actual compilation time and performance, as well as the impact of different `splitting` settings, is 
+expression-dependent. In most cases, however, the default value should be sufficient.
+
+Here's an example showing how different values affect compilation time and performance:
+```julia
+using SourceCodeMcCormick, Symbolics, CUDA
+Symbolics.@variables x, y
+expr = exp(x/y) - (x*y^2)/(y+1)
+
+# CuArray values for SCMC timing
+x_in = hcat(2.5.*CUDA.rand(Float64, 8192) .+ 0.5, 
+            0.5.*CUDA.ones(Float64, 8192), 
+            3.0.*CUDA.ones(Float64, 8192))
+y_in = hcat(1.9.*CUDA.rand(Float64, 8192) .+ 0.1, 
+            0.1.*CUDA.ones(Float64, 8192), 
+            2.0.*CUDA.ones(Float64, 8192))
+OUT = CUDA.zeros(Float64, 8192, 8)
+
+##################################
+# Default splitting (creates 1 kernel internally, based on the size of this expr)
+@time new_func = kgen(expr, overwrite=true);
+#  4.100798 seconds (3.70 M allocations: 162.637 MiB, 1.47% gc time, 12.29% compilation time)
+
+@btime new_func($OUT, $x_in, $y_in);
+#  77.000 μs (18 allocations: 384 bytes)
+
+# --> This provides a good balance of compilation time and fast performance
+
+##################################
+# Higher splitting (creates 2 kernels internally)
+@time new_func = kgen(expr, splitting=:high, overwrite=true);
+#  3.452594 seconds (3.87 M allocations: 170.845 MiB, 13.87% compilation time)
+
+@btime new_func($OUT, $x_in, $y_in);
+#  117.000 μs (44 allocations: 960 bytes)
+
+# --> Splitting the function into 2 shorter kernels yields a marginally faster
+#     compilation time, but performance is marginally worse due to needing twice
+#     as many calls to kernels
+
+##################################
+# Maximum splitting (creates 4 kernels internally)
+@time new_func = kgen(expr, splitting=:max, overwrite=true);
+#  5.903894 seconds (5.88 M allocations: 260.864 MiB, 12.91% compilation time)
+
+@btime new_func($OUT, $x_in, $y_in);
+#  184.900 μs (83 allocations: 1.91 KiB)
+
+# --> Given the simplicity of the expression, splitting into 4 kernels does not
+#     provide benefit over the 2 kernels created with :high. Compilation time
+#     is longer because twice as many kernels need to be compiled (and each is
+#     not much less complicated than in the :high case), and performance is worse
+#     (because the number of kernel calls is doubled relative to the :high case
+#     without much decrease in complexity). 
+```
+
+## The ParBB Algorithm
+
+The intended use of `SCMC` is in conjunction with a branch-and-bound algorithm that is able 
+to make use of relaxations and subgradient information that are calculated in parallel on a 
+GPU. An implementation of such an algorithm is available for `SCMC` version 0.4, and is
+under development for version 0.5. See the paper reference in the section "Citing SourceCodeMcCormick" for 
+a more complete description of the ParBB algorithm for version 0.4. Briefly, ParBB is built 
+as an extension of the EAGO solver, and it works by parallelizing the node procesing routines 
+in such a way that tasks may be performed by a GPU.
+
+
+## Citing SourceCodeMcCormick
+
+Please cite the following paper when using SourceCodeMcCormick.jl. In plain text form this is:
+```
+Gottlieb, R. X., Xu, P., and Stuber, M. D. Automatic source code generation for deterministic
+global optimization with parallel architectures. Optimization Methods and Software, 1–39 (2024).
+DOI: 10.1080/10556788.2024.2396297
+```
+A BibTeX entry is given below:
+```bibtex
+@Article{doi:10.1080/10556788.2024.2396297,
+  author    = {Robert X. Gottlieb, Pengfei Xu, and Matthew D. Stuber},
+  journal   = {Optimization Methods and Software},
+  title     = {Automatic source code generation for deterministic global optimization with parallel architectures},
+  year      = {2024},
+  pages     = {1--39},
+  doi       = {10.1080/10556788.2024.2396297},
+  eprint    = {https://doi.org/10.1080/10556788.2024.2396297},
+  publisher = {Taylor \& Francis},
+  url       = {https://doi.org/10.1080/10556788.2024.2396297},
+}
+```
+
+
+# README for v0.4 (Deprecated)
+
 This package uses source-code transformation to construct McCormick-based relaxations. Expressions composed
 of `Symbolics.jl`-type variables can be passed into `SourceCodeMcCormick.jl` (`SCMC`) functions, after which
 the expressions are factored, generalized McCormick relaxation rules and inclusion monotonic interval
@@ -18,7 +332,7 @@ numbers are recommended
 for relaxations to maintain accuracy.
 
 
-## Basic Functionality
+## Basic Functionality (v0.4)
 
 The primary user-facing function is `fgen` ("function generator"). The `fgen` function returns a source-code-generated
 function that provides evaluations of convex and concave relaxations, inclusion monotonic interval extensions,
@@ -143,7 +457,7 @@ SourceCodeMcCormick functionality that creates these functions which will even f
 calculation speed.
 
 
-## Arguments for `fgen`
+## Arguments for `fgen` (v0.4)
 
 The `fgen` function can be called with only a `Num`-type expression as an input (as in the examples in the
 previous section), or with many other possible arguments that affect `fgen`'s behavior. Some of these
@@ -339,7 +653,7 @@ these outputs does not impact the speed of the generated functions, since the ir
 aren't used in any calculations.
 
 
-## The ParBB Algorithm
+## The ParBB Algorithm (v0.4)
 
 The intended use of SourceCodeMcCormick is in conjunction with a branch-and-bound algorithm
 that is able to make use of relaxations and subgradient information that are calculated in
@@ -705,7 +1019,7 @@ that ParBB is able to make use of the faster computing hardware of GPUs, and eve
 processed, can converge more quickly overall.
 
 
-## Limitations
+## Limitations (v0.4)
 
 (See "Citing SourceCodeMcCormick" for limitations on a pre-subgradient version of SourceCodeMcCormick.)
 
@@ -725,7 +1039,7 @@ more frequently with respect to the bounds on its domain may perform worse than 
 where the structure of the relaxation is more consistent. 
 
 
-## Citing SourceCodeMcCormick
+## Citing SourceCodeMcCormick (v0.3)
 Please cite the following paper when using SourceCodeMcCormick.jl. In plain text form this is:
 ```
 Gottlieb, R. X., Xu, P., and Stuber, M. D. Automatic source code generation for deterministic
