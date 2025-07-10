@@ -58,8 +58,12 @@ function kgen(num::Num, gradlist::Vector{Num}, raw_outputs::Vector{Symbol}, cons
     indep_vars = get_name.(pull_vars(num))
 
     # Deal with quadratic functions differently, if `affine_quadratic` is true.
-    # This uses Matt's version of affine quadratic relaxations, seen in EAGO's
-    # `affine_relax_quadratic!` function.
+    # This uses SCIP's method of handling nonconvex quadratic terms, which is explained
+    # in section 2.4.3.2 of:
+    # Vigerske, S. and Gleixner, A. "SCIP: global optimization of mixed-integer 
+    # nonlinear programs in a branch-and-cut framework". Optimization Methods 
+    # and Software, 33:3, 563-593 (2018). DOI: 10.1080/10556788.2017.1335312
+    # This method is also used in EAGO's `affine_relax_quadratic!` function.
     if affine_quadratic==true && is_quadratic(num) # NOTE: When switching to MOI variables, this will be easy to detect
         func_name = kgen_affine_quadratic(expr_hash, num, gradlist, func_outputs, constants)
         return func_name
