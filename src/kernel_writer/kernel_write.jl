@@ -1560,6 +1560,8 @@ function write_operation(file::IOStream, RHS::BasicSymbolic{Real}, inputs::Vecto
             write(file, SCMC_float_power_kernel(inputs..., 0.5, gradlist, sparsity))
         elseif RHS.f==cos
             write(file, SCMC_cos_kernel(inputs..., gradlist, sparsity))
+        elseif RHS.f==abs
+            write(file, SCMC_abs_kernel(inputs..., gradlist, sparsity))
         else
             close(file)
             error("Some function was used that we can't handle yet ($RHS)")
@@ -1929,8 +1931,14 @@ function _complexity(complexity::Vector{Int}, factorized::Vector{Equation}, star
             if !isnothing(new_ID)
                 total_lines += _complexity(complexity, factorized, new_ID)
             end
+        elseif RHS.f==abs
+            total_lines += 280
+            new_ID = findfirst(x -> isequal(x.lhs, RHS.arguments[1]), factorized)
+            if !isnothing(new_ID)
+                total_lines += _complexity(complexity, factorized, new_ID)
+            end
         else
-            error("Unknown function")
+            error("Some function was used that we can't handle yet ($RHS)")
         end
     elseif exprtype(RHS) == SYM
         nothing

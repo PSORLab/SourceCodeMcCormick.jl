@@ -1150,6 +1150,162 @@ function SCMC_inv_kernel(OUT::CuDeviceMatrix, x::CuDeviceMatrix)
     return nothing
 end
 
+
+# Absolute value
+# max threads: ???
+function SCMC_abs_kernel(OUT::CuDeviceMatrix, x::CuDeviceMatrix)
+    idx = threadIdx().x + (blockIdx().x - Int32(1)) * blockDim().x
+    stride = blockDim().x * gridDim().x
+    colmax = Int32((size(OUT,2)-4)/2)
+
+    while idx <= Int32(size(OUT,1))
+        # Reset the column counter
+        col = Int32(1)
+        
+        # Get interval extension
+        if x[idx,4] >= 0.0 && x[idx,3] <= 0.0
+            OUT[idx,3] = 0.0
+        else
+            OUT[idx,3] = min(abs(x[idx,3]), abs(x[idx,4]))
+        end
+        OUT[idx,4] = max(abs(x[idx,3]), abs(x[idx,4]))
+
+        # Calculate eps_min and eps_max
+        if x[idx,3] >= 0.0
+            eps_min = x[idx,3]
+        elseif x[idx,4] <= 0.0
+            eps_min = x[idx,4]
+        else
+            eps_min = 0.0
+        end
+        if abs(x[idx,4]) >= abs(x[idx,3])
+            eps_max = x[idx,4]
+        else
+            eps_max = x[idx,3]
+        end
+
+        # Get midcv and midcc by finding the middle values of (cv, cc, eps_min), (cv, cc, eps_max)
+        midcv, cv_id, midcc, cc_id = midvals(x[idx,1], x[idx,2], eps_min, eps_max)
+
+        # Get derivative values
+        if x[idx,4] - x[idx,3] == 0.0
+            OUT[idx,2] = abs(midcc)
+            if midcc > 0.0
+                dcc = 1.0
+            elseif midcc < 0.0
+                dcc = -1.0
+            else
+                dcc = 0.0
+            end
+        else
+            OUT[idx,2] = (abs(x[idx,3])*(x[idx,4] - midcc) + abs(x[idx,4])*(midcc - x[idx,3]))/(x[idx,4]-x[idx,3])
+            dcc = (abs(x[idx,4]) - abs(x[idx,3]))/(x[idx,4]-x[idx,3])
+        end
+        OUT[idx,1] = abs(midcv)
+        if midcv > 0.0
+            dcv = 1.0
+        elseif midcc < 0.0
+            dcv = -1.0
+        else
+            dcv = 0.0
+        end
+
+        # Calculate subgradients
+        if cv_id==1
+            if cc_id==1
+                col = Int32(1)
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = x[idx,end-1*colmax+col]*dcv
+                    OUT[idx,end-1*colmax+col] = x[idx,end-1*colmax+col]*dcc
+                    col += Int32(1)
+                end
+            elseif cc_id==2
+                col = Int32(1)
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = x[idx,end-1*colmax+col]*dcv
+                    OUT[idx,end-1*colmax+col] = x[idx,end-2*colmax+col]*dcc
+                    col += Int32(1)
+                end
+            else
+                col = Int32(1)
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = x[idx,end-1*colmax+col]*dcv
+                    OUT[idx,end-1*colmax+col] = 0.0
+                    col += Int32(1)
+                end
+            end
+        elseif cv_id==2
+            if cc_id==1
+                col = Int32(1)
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = x[idx,end-2*colmax+col]*dcv
+                    OUT[idx,end-1*colmax+col] = x[idx,end-1*colmax+col]*dcc
+                    col += Int32(1)
+                end
+            elseif cc_id==2
+                col = Int32(1)
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = x[idx,end-2*colmax+col]*dcv
+                    OUT[idx,end-1*colmax+col] = x[idx,end-2*colmax+col]*dcc
+                    col += Int32(1)
+                end
+            else
+                col = Int32(1)
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = x[idx,end-2*colmax+col]*dcv
+                    OUT[idx,end-1*colmax+col] = 0.0
+                    col += Int32(1)
+                end
+            end
+        else
+            if cc_id==1
+                col = Int32(1)
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = 0.0
+                    OUT[idx,end-1*colmax+col] = x[idx,end-1*colmax+col]*dcc
+                    col += Int32(1)
+                end
+            elseif cc_id==2
+                col = Int32(1)
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = 0.0
+                    OUT[idx,end-1*colmax+col] = x[idx,end-2*colmax+col]*dcc
+                    col += Int32(1)
+                end
+            else
+                col = Int32(1)
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = 0.0
+                    OUT[idx,end-1*colmax+col] = 0.0
+                    col += Int32(1)
+                end
+            end
+        end
+
+        # Perform the cut operation
+        if OUT[idx,1] < OUT[idx,3]
+            OUT[idx,1] = OUT[idx,3]
+            col = Int32(1)
+            while col <= colmax
+                OUT[idx,end-2*colmax+col] = 0.0
+                col += Int32(1)
+            end
+        end
+        if OUT[idx,2] > OUT[idx,4]
+            OUT[idx,2] = OUT[idx,4]
+            col = Int32(1)
+            while col <= colmax
+                OUT[idx,end-1*colmax+col] = 0.0
+                col += Int32(1)
+            end
+        end
+
+        idx += stride
+    end
+    return nothing
+end
+
+
 # Multiplication by a constant
 # max threads: 640
 function SCMC_cmul_kernel(OUT::CuDeviceMatrix, CONST::Real, x::CuDeviceMatrix)
@@ -4463,8 +4619,7 @@ end
 
 # Cosine (argument should be in radians)
 # NOTE: Sine can be cos(x - pi/2)
-function SCMC_cos_kernel(OUT, x)
-# function SCMC_cos_kernel(OUT::CuDeviceMatrix, x::CuDeviceMatrix)
+function SCMC_cos_kernel(OUT::CuDeviceMatrix, x::CuDeviceMatrix)
     idx = threadIdx().x + (blockIdx().x - Int32(1)) * blockDim().x
     stride = blockDim().x * gridDim().x
     colmax = Int32((size(OUT,2)-4)/2)
