@@ -698,7 +698,21 @@ function create_kernel!(expr_hash::String, kernel_ID::Int, num::BasicSymbolic{Re
 
         # Now we can pass the equation's RHS and the inputs to call the correct
         # writer function
-        write_operation(file, factorized[factorized_ID].rhs, inputs, string.(gradlist), sparsity[i])
+        if length(inputs)>2 && inputs[1]==inputs[2]
+            # Special case. We're adding inputs[3] to inputs[2], so we only want
+            # to pass the sparsity information of inputs[3] (rather than the
+            # sparsity information of inputs[2] and inputs[3])
+            corrected_i = findfirst(x->x==inputs[3], varorder)
+            write_operation(file, factorized[factorized_ID].rhs, inputs, string.(gradlist), sparsity[corrected_i])
+        elseif length(inputs)>2 && inputs[1]==inputs[3]
+            # Special case. We're adding inputs[2] to inputs[3], so we only want
+            # to pass the sparsity information of inputs[2] (rather than the
+            # sparsity information of inputs[2] and inputs[3])
+            corrected_i = findfirst(x->x==inputs[2], varorder)
+            write_operation(file, factorized[factorized_ID].rhs, inputs, string.(gradlist), sparsity[corrected_i])
+        else
+            write_operation(file, factorized[factorized_ID].rhs, inputs, string.(gradlist), sparsity[i])
+        end
 
         # Now that we're done with this variable, eliminate this variable
         # from the lists of temporary variables' requirements
