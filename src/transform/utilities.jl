@@ -284,6 +284,9 @@ function pull_vars(eqns::Vector{Equation})
     end
     return vars
 end
+function pull_vars(eqn::T) where T<:Real
+    return Num[]
+end
 
 # Sorts variables in a more logical ordering, to be consistent
 # with McCormick.jl organization. 

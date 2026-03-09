@@ -6,6 +6,12 @@
 # these same functions, but in buffer/string form for the purposes of writing
 # new kernels.
 
+# NOTE: These kernels might all be faster if we flip the ordering of indices.
+#       I.e., instead of having each row be a unique point to evaluate, make
+#       each column a unique point to evaluate. Preliminary checking on my
+#       workstation says this could be ~25% faster (tried for multiplication,
+#       100000 unique points)
+
 #=
 Unitary Rules
 =#
@@ -1143,6 +1149,162 @@ function SCMC_inv_kernel(OUT::CuDeviceMatrix, x::CuDeviceMatrix)
     end
     return nothing
 end
+
+
+# Absolute value
+# max threads: ???
+function SCMC_abs_kernel(OUT::CuDeviceMatrix, x::CuDeviceMatrix)
+    idx = threadIdx().x + (blockIdx().x - Int32(1)) * blockDim().x
+    stride = blockDim().x * gridDim().x
+    colmax = Int32((size(OUT,2)-4)/2)
+
+    while idx <= Int32(size(OUT,1))
+        # Reset the column counter
+        col = Int32(1)
+        
+        # Get interval extension
+        if x[idx,4] >= 0.0 && x[idx,3] <= 0.0
+            OUT[idx,3] = 0.0
+        else
+            OUT[idx,3] = min(abs(x[idx,3]), abs(x[idx,4]))
+        end
+        OUT[idx,4] = max(abs(x[idx,3]), abs(x[idx,4]))
+
+        # Calculate eps_min and eps_max
+        if x[idx,3] >= 0.0
+            eps_min = x[idx,3]
+        elseif x[idx,4] <= 0.0
+            eps_min = x[idx,4]
+        else
+            eps_min = 0.0
+        end
+        if abs(x[idx,4]) >= abs(x[idx,3])
+            eps_max = x[idx,4]
+        else
+            eps_max = x[idx,3]
+        end
+
+        # Get midcv and midcc by finding the middle values of (cv, cc, eps_min), (cv, cc, eps_max)
+        midcv, cv_id, midcc, cc_id = midvals(x[idx,1], x[idx,2], eps_min, eps_max)
+
+        # Get derivative values
+        if x[idx,4] - x[idx,3] == 0.0
+            OUT[idx,2] = abs(midcc)
+            if midcc > 0.0
+                dcc = 1.0
+            elseif midcc < 0.0
+                dcc = -1.0
+            else
+                dcc = 0.0
+            end
+        else
+            OUT[idx,2] = (abs(x[idx,3])*(x[idx,4] - midcc) + abs(x[idx,4])*(midcc - x[idx,3]))/(x[idx,4]-x[idx,3])
+            dcc = (abs(x[idx,4]) - abs(x[idx,3]))/(x[idx,4]-x[idx,3])
+        end
+        OUT[idx,1] = abs(midcv)
+        if midcv > 0.0
+            dcv = 1.0
+        elseif midcc < 0.0
+            dcv = -1.0
+        else
+            dcv = 0.0
+        end
+
+        # Calculate subgradients
+        if cv_id==1
+            if cc_id==1
+                col = Int32(1)
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = x[idx,end-1*colmax+col]*dcv
+                    OUT[idx,end-1*colmax+col] = x[idx,end-1*colmax+col]*dcc
+                    col += Int32(1)
+                end
+            elseif cc_id==2
+                col = Int32(1)
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = x[idx,end-1*colmax+col]*dcv
+                    OUT[idx,end-1*colmax+col] = x[idx,end-2*colmax+col]*dcc
+                    col += Int32(1)
+                end
+            else
+                col = Int32(1)
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = x[idx,end-1*colmax+col]*dcv
+                    OUT[idx,end-1*colmax+col] = 0.0
+                    col += Int32(1)
+                end
+            end
+        elseif cv_id==2
+            if cc_id==1
+                col = Int32(1)
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = x[idx,end-2*colmax+col]*dcv
+                    OUT[idx,end-1*colmax+col] = x[idx,end-1*colmax+col]*dcc
+                    col += Int32(1)
+                end
+            elseif cc_id==2
+                col = Int32(1)
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = x[idx,end-2*colmax+col]*dcv
+                    OUT[idx,end-1*colmax+col] = x[idx,end-2*colmax+col]*dcc
+                    col += Int32(1)
+                end
+            else
+                col = Int32(1)
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = x[idx,end-2*colmax+col]*dcv
+                    OUT[idx,end-1*colmax+col] = 0.0
+                    col += Int32(1)
+                end
+            end
+        else
+            if cc_id==1
+                col = Int32(1)
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = 0.0
+                    OUT[idx,end-1*colmax+col] = x[idx,end-1*colmax+col]*dcc
+                    col += Int32(1)
+                end
+            elseif cc_id==2
+                col = Int32(1)
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = 0.0
+                    OUT[idx,end-1*colmax+col] = x[idx,end-2*colmax+col]*dcc
+                    col += Int32(1)
+                end
+            else
+                col = Int32(1)
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = 0.0
+                    OUT[idx,end-1*colmax+col] = 0.0
+                    col += Int32(1)
+                end
+            end
+        end
+
+        # Perform the cut operation
+        if OUT[idx,1] < OUT[idx,3]
+            OUT[idx,1] = OUT[idx,3]
+            col = Int32(1)
+            while col <= colmax
+                OUT[idx,end-2*colmax+col] = 0.0
+                col += Int32(1)
+            end
+        end
+        if OUT[idx,2] > OUT[idx,4]
+            OUT[idx,2] = OUT[idx,4]
+            col = Int32(1)
+            while col <= colmax
+                OUT[idx,end-1*colmax+col] = 0.0
+                col += Int32(1)
+            end
+        end
+
+        idx += stride
+    end
+    return nothing
+end
+
 
 # Multiplication by a constant
 # max threads: 640
@@ -4455,6 +4617,182 @@ function SCMC_large_float_power_kernel(OUT::CuDeviceMatrix, x::CuDeviceMatrix, c
     return nothing
 end
 
+# Cosine (argument should be in radians)
+# NOTE: Sine can be cos(x - pi/2)
+function SCMC_cos_kernel(OUT::CuDeviceMatrix, x::CuDeviceMatrix)
+    idx = threadIdx().x + (blockIdx().x - Int32(1)) * blockDim().x
+    stride = blockDim().x * gridDim().x
+    colmax = Int32((size(OUT,2)-4)/2)
+
+    while idx <= Int32(size(OUT,1))
+        # Reset the column counter
+        col = Int32(1)
+
+        # Get lower and upper bounds from the interval
+        if (x[idx,4] - x[idx,3]) >= 2.0*pi
+            OUT[idx,3] = -1.0
+            OUT[idx,4] = 1.0
+        else
+            lo_quadrant, lo = quadrant(x[idx,3])
+            hi_quadrant, hi = quadrant(x[idx,4])
+        
+            if lo_quadrant == hi_quadrant
+                if x[idx,4] - x[idx,3] > 3.141592653589793
+                    OUT[idx,3] = -1.0
+                    OUT[idx,4] = 1.0
+                elseif lo_quadrant==2 || lo_quadrant==3
+                    OUT[idx,3] = cos(lo)
+                    OUT[idx,4] = cos(hi)
+                else
+                    OUT[idx,3] = cos(hi)
+                    OUT[idx,4] = cos(lo)
+                end
+            elseif lo_quadrant==2 && hi_quadrant==3
+                OUT[idx,3] = cos(lo)
+                OUT[idx,4] = cos(hi)
+            elseif lo_quadrant==0 && hi_quadrant==1
+                OUT[idx,3] = cos(hi)
+                OUT[idx,4] = cos(lo)
+            elseif (lo_quadrant==2 || lo_quadrant==3) && (hi_quadrant==0 || hi_quadrant==1)
+                OUT[idx,3] = min(cos(lo), cos(hi))
+                OUT[idx,4] = 1.0
+            elseif (lo_quadrant==0 || lo_quadrant==1) && (hi_quadrant==2 || hi_quadrant==3)
+                OUT[idx,3] = -1.0
+                OUT[idx,4] = max(cos(lo), cos(hi))
+            else
+                OUT[idx,3] = -1.0
+                OUT[idx,4] = 1.0
+            end
+        end
+
+
+        # get eps_min and eps_max
+        kL = Base.ceil(-0.5 - x[idx,3]/(2.0*pi))
+        xL1 = x[idx,3] + 2.0*pi*kL
+        xU1 = x[idx,4] + 2.0*pi*kL
+        if (xL1 < -pi) || (xL1 > pi)
+            eps_min = NaN
+            eps_max = NaN
+        elseif xL1 <= 0.0
+            if xU1 <= 0.0
+                eps_min = x[idx,3]
+                eps_max = x[idx,4]
+            elseif xU1 >= pi
+                eps_min = pi - 2.0*pi*kL
+                eps_max = -2.0*pi*kL
+            else
+                eps_min = (cos(xL1) <= cos(xU1)) ? x[idx,3] : x[idx,4]
+                eps_max = -2.0*pi*kL
+            end
+        elseif xU1 <= pi
+            eps_min = x[idx,4]
+            eps_max = x[idx,3]
+        elseif xU1 >= 2.0*pi
+            eps_min = pi - 2.0*pi*kL
+            eps_max = 2.0*pi - 2.0*pi*kL
+        else
+            eps_min = pi - 2.0*pi*kL
+            eps_max = (cos(xL1) >= cos(xU1)) ? x[idx,3] : x[idx,4]
+        end
+
+        midcv, cv_id, midcc, cc_id = midvals(x[idx,1], x[idx,2], eps_min, eps_max)
+
+        # Call cv normally
+        cv, dcv = SCMC_cv_cos(midcv, x[idx,3], x[idx,4])
+        OUT[idx,1] = cv
+
+        # Call cc by shifting and negating the cv path
+        neg_cc, neg_dcc = SCMC_cv_cos(midcc - pi, x[idx,3] - pi, x[idx,4] - pi)
+        OUT[idx,2] = -neg_cc
+        dcc = -neg_dcc
+
+        # Now we need mid_grad things...
+        if cv_id==1
+            if cc_id==1
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = x[idx,end-1*colmax+col]*dcv
+                    OUT[idx,end-1*colmax+col] = x[idx,end-1*colmax+col]*dcc
+                    col += Int32(1)
+                end
+            elseif cc_id==2
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = x[idx,end-1*colmax+col]*dcv
+                    OUT[idx,end-1*colmax+col] = x[idx,end-2*colmax+col]*dcc
+                    col += Int32(1)
+                end
+            else
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = x[idx,end-1*colmax+col]*dcv
+                    OUT[idx,end-1*colmax+col] = 0.0
+                    col += Int32(1)
+                end
+            end
+        elseif cv_id==2
+            if cc_id==1
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = x[idx,end-2*colmax+col]*dcv
+                    OUT[idx,end-1*colmax+col] = x[idx,end-1*colmax+col]*dcc
+                    col += Int32(1)
+                end
+            elseif cc_id==2
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = x[idx,end-2*colmax+col]*dcv
+                    OUT[idx,end-1*colmax+col] = x[idx,end-2*colmax+col]*dcc
+                    col += Int32(1)
+                end
+            else
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = x[idx,end-2*colmax+col]*dcv
+                    OUT[idx,end-1*colmax+col] = 0.0
+                    col += Int32(1)
+                end
+            end
+        else
+            if cc_id==1
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = 0.0
+                    OUT[idx,end-1*colmax+col] = x[idx,end-1*colmax+col]*dcc
+                    col += Int32(1)
+                end
+            elseif cc_id==2
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = 0.0
+                    OUT[idx,end-1*colmax+col] = x[idx,end-2*colmax+col]*dcc
+                    col += Int32(1)
+                end
+            else
+                while col <= colmax
+                    OUT[idx,end-2*colmax+col] = 0.0
+                    OUT[idx,end-1*colmax+col] = 0.0
+                    col += Int32(1)
+                end
+            end
+        end
+
+        # Perform the cut operation
+        if OUT[idx,1] < OUT[idx,3]
+            OUT[idx,1] = OUT[idx,3]
+            col = Int32(1)
+            while col <= colmax
+                OUT[idx,end-2*colmax+col] = 0.0
+                col += Int32(1)
+            end
+        end
+        if OUT[idx,2] > OUT[idx,4]
+            OUT[idx,2] = OUT[idx,4]
+            col = Int32(1)
+            while col <= colmax
+                OUT[idx,end-1*colmax+col] = 0.0
+                col += Int32(1)
+            end
+        end
+
+        idx += stride
+    end
+    return nothing
+end
+
+
 #=
 Binary Rules
 =#
@@ -4860,6 +5198,269 @@ function SCMC_add_kernel(OUT::CuDeviceMatrix, x::CuDeviceMatrix, y::CuDeviceMatr
     end
     return nothing
 end
+
+
+##################
+# Helper functions for some kernels to use
+function midvals(xcv::Float64, xcc::Float64, eps_min::Float64, eps_max::Float64)
+    if xcc >= xcv
+        if xcv == xcc
+            midcc = xcv 
+            cc_id = Int32(2)
+            midcv = xcv 
+            cv_id = Int32(2)
+        elseif xcv >= eps_max
+            if xcv >= eps_min
+                midcc = xcv 
+                cc_id = Int32(2)
+                midcv = xcv 
+                cv_id = Int32(2)
+            elseif eps_min >= xcc
+                midcc = xcv 
+                cc_id = Int32(2)
+                midcv = xcc 
+                cv_id = Int32(1)
+            else
+                midcc = xcv 
+                cc_id = Int32(2)
+                midcv = eps_min 
+                cv_id = Int32(3)
+            end
+        elseif eps_max >= xcc
+            if xcv >= eps_min
+                midcc = xcc 
+                cc_id = Int32(1)
+                midcv = xcv 
+                cv_id = Int32(2)
+            elseif eps_min >= xcc
+                midcc = xcc 
+                cc_id = Int32(1)
+                midcv = xcc 
+                cv_id = Int32(1)
+            else
+                midcc = xcc 
+                cc_id = Int32(1)
+                midcv = eps_min 
+                cv_id = Int32(3)
+            end
+        else
+            if xcv >= eps_min
+                midcc = eps_max 
+                cc_id = Int32(3)
+                midcv = xcv 
+                cv_id = Int32(2)
+            elseif eps_min >= xcc
+                midcc = eps_max 
+                cc_id = Int32(3)
+                midcv = xcc 
+                cv_id = Int32(1)
+            else
+                midcc = eps_max 
+                cc_id = Int32(3)
+                midcv = eps_min 
+                cv_id = Int32(3)
+            end
+        end
+    elseif eps_max >= xcv
+        if eps_min >= xcv
+            midcc = xcv 
+            cc_id = Int32(2)
+            midcv = xcv 
+            cv_id = Int32(2)
+        elseif xcc >= eps_min
+            midcc = xcv 
+            cc_id = Int32(2)
+            midcv = xcc 
+            cv_id = Int32(1)
+        else
+            midcc = xcv 
+            cc_id = Int32(2)
+            midcv = eps_min 
+            cv_id = Int32(3)
+        end
+    elseif xcc >= eps_max
+        if eps_min >= xcv
+            midcc = xcc 
+            cc_id = Int32(1)
+            midcv = xcv 
+            cv_id = Int32(2)
+        elseif xcc >= eps_min
+            midcc = xcc 
+            cc_id = Int32(1)
+            midcv = xcc 
+            cv_id = Int32(1)
+        else
+            midcc = xcc 
+            cc_id = Int32(1)
+            midcv = eps_min 
+            cv_id = Int32(3)
+        end
+    else
+        if eps_min >= xcv
+            midcc = eps_max 
+            cc_id = Int32(3)
+            midcv = xcv 
+            cv_id = Int32(2)
+        elseif xcc >= eps_min
+            midcc = eps_max 
+            cc_id = Int32(3)
+            midcv = xcc 
+            cv_id = Int32(1)
+        else
+            midcc = eps_max 
+            cc_id = Int32(3)
+            midcv = eps_min 
+            cv_id = Int32(3)
+        end
+    end
+    return midcv, cv_id, midcc, cc_id
+end
+
+@inline function SCMC_cv_cos(x::Float64, xL::Float64, xU::Float64)
+    kL = Base.ceil(-0.5 - xL/(2.0*pi))
+    if x <= (pi - 2.0*pi*kL)
+        xL1 = xL + 2.0*pi*kL
+        if xL1 >= pi/2.0
+            return cos(x), -sin(x)
+        end
+        xU1 = min(xU + 2.0*pi*kL, pi)
+        if (xL1 >= -pi/2) && (xU1 <= pi/2)
+            if abs(xU - xL) < 1E-10
+                return cos(xL), 0.0
+            else
+                return cos(xL) + (x - xL)*(cos(xU) - cos(xL))/(xU - xL),
+                        (cos(xU) - cos(xL))/(xU - xL)
+            end
+        end
+        return SCMC_cv_cosin(x + 2.0*pi*kL, xL1, xU1)
+    end
+    kU = Base.floor(0.5 - xU/(2.0*pi))
+    if (x >= -pi - 2.0*pi*kU)
+        xU2 = xU + 2.0*pi*kU
+        if xU2 <= -pi/2.0
+            return cos(x), -sin(x)
+        end
+        return SCMC_cv_cosin(x + 2.0*pi*kU, max(xL + 2.0*pi*kU, -pi), xU2)
+    end
+    return -1.0, 0.0
+end
+
+# Needs to return only two things (inlining to make comparisons with x)
+@inline function SCMC_cv_cosin(x::Float64, xL::Float64, xU::Float64)
+    if abs(xL) <= abs(xU)
+        left = false
+        x0 = xU
+        xm = xL
+    else
+        left = true
+        x0 = xL
+        xm = xU
+    end
+    xj = cos_newton_or_golden_section(x0, xL, xU, xm)
+    if (left && (x <= xj)) || (~left && (x >= xj))
+        return cos(x), -sin(x)
+    else
+        if abs(xm - xj) < 1e-10
+            return cos(xm), 0.0
+        else
+            return cos(xm) + (x - xm)*(cos(xm) - cos(xj))/(xm - xj), (cos(xm) - cos(xj))/(xm - xj)
+        end
+    end
+end
+
+function cos_newton_or_golden_section(x0::Float64, xL::Float64, xU::Float64, envp::Float64)
+    dfk = 0.0
+    xk = max(xL, min(x0, xU))
+    fk = (xk - envp)*sin(xk) + cos(xk) - cos(envp)
+    iter = Int32(1)
+    while iter <= Int32(100)
+        dfk = (xk - envp)*cos(xk)
+        if abs(fk) < 1e-10
+            return xk
+        end
+        if iszero(dfk)
+            xk = 0.0
+            break # Need to do golden section
+        end
+        if (xk == xL) && (fk/dfk > 0.0)
+            return xk
+        elseif (xk == xU) && (fk/dfk < 0.0)
+            return xk
+        end
+        xk = max(xL, min(xU, xk - fk/dfk))
+        fk = (xk - envp)*sin(xk) + cos(xk) - cos(envp)
+        iter += Int32(1)
+    end
+
+    # If flag, we need to do golden section instead
+    a_golden = xL
+    fa_golden = (a_golden - envp)*sin(a_golden) + cos(a_golden) - cos(envp)
+    c_golden = xU
+    fc_golden = (c_golden - envp)*sin(c_golden) + cos(c_golden) - cos(envp)
+
+    if fa_golden*fc_golden > 0
+        xk = NaN
+        return xk
+    end
+
+    b_golden = xU - (2.0 - Base.MathConstants.golden)*(xU - xL)
+    fb_golden = (b_golden - envp)*sin(b_golden) + cos(b_golden) - cos(envp)
+
+    iter = Int32(1)
+    while iter <= Int32(100)
+        if (c_golden - b_golden > b_golden - a_golden)
+            x_golden = b_golden + (2.0 - Base.MathConstants.golden)*(c_golden - b_golden)
+            if abs(c_golden-a_golden) < 1.0e-10*(abs(b_golden) + abs(x_golden)) || iter == Int32(100)
+                xk = (c_golden + a_golden)/2.0
+                return xk
+            end
+            iter += Int32(1)
+            fx_golden = (x_golden - envp)*sin(x_golden) + cos(x_golden) - cos(envp)
+            if fa_golden*fx_golden < 0.0
+                c_golden = x_golden
+                fc_golden = fx_golden
+            else
+                a_golden = b_golden
+                fa_golden = fb_golden
+                b_golden = x_golden
+                fb_golden = fx_golden
+            end
+        else
+            x_golden = b_golden - (2.0 - Base.MathConstants.golden)*(b_golden - a_golden)
+            if abs(c_golden-a_golden) < 1.0e-10*(abs(b_golden) + abs(x_golden)) || iter == Int32(100)
+                xk = (c_golden + a_golden)/2.0
+                return xk
+            end
+            iter += Int32(1)
+            fx_golden = (x_golden - envp)*sin(x_golden) + cos(x_golden) - cos(envp)
+            if fa_golden*fb_golden < 0.0
+                c_golden = b_golden
+                fc_golden = fb_golden
+                b_golden = x_golden
+                fb_golden = fx_golden
+            else
+                a_golden = x_golden
+                fa_golden = fx_golden
+            end
+        end
+    end
+
+    # Should never get to this point, but for completeness...
+    return xk
+end
+
+# Directly from IntervalArithmetic.jl
+function quadrant(x::Float64)
+    x_mod2pi = rem2pi(x, RoundNearest)
+    
+    x_mod2pi < -(pi/2.0) && return (Int32(2), x_mod2pi)
+    x_mod2pi < 0 && return (Int32(3), x_mod2pi)
+    x_mod2pi <= (pi/2.0) && return (Int32(0), x_mod2pi)
+
+    return Int32(1), x_mod2pi
+end
+
+
 
 
 

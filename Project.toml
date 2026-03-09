@@ -1,7 +1,7 @@
 name = "SourceCodeMcCormick"
 uuid = "a7283dc5-4ecf-47fb-a95b-1412723fc960"
 authors = ["Robert Gottlieb <Robert.x.gottlieb@uconn.edu>"]
-version = "0.5.0"
+version = "0.5.1"
 
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
