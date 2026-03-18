@@ -9,6 +9,7 @@ using DocStringExtensions
 using Graphs
 using CUDA
 using StaticArrays: @MVector
+using MultiFloats
 import Dates
 import SymbolicUtils: BasicSymbolic, exprtype, SYM, TERM, ADD, MUL, POW, DIV
 

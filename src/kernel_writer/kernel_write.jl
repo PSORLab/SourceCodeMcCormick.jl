@@ -109,13 +109,10 @@ function kgen(num::Num, gradlist::Vector{Num}, raw_outputs::Vector{Symbol}, cons
         error("Splitting must be one of: {:low, :default, :high, :max}")
     end
 
-    # Pull out sparsity information in the factorization
-    sparsity = detect_sparsity(factored, gradlist)
-
     # Decide if the kernel needs to be split
     if (n_vars[end] < 31) && ((n_lines[end] <= max_size) || (findfirst(x -> x > split_point, n_lines)==length(n_lines)))
         # Complexity is fairly low; only a single kernel needed
-        create_kernel!(expr_hash, 1, num, get_name.(gradlist), func_outputs, constants, factored, sparsity)
+        create_kernel!(expr_hash, 1, num, get_name.(gradlist), func_outputs, constants, factored)
         push!(kernel_nums, 1)
         push!(inputs, string.(indep_vars))
         push!(outputs, "OUT")
@@ -169,7 +166,7 @@ function kgen(num::Num, gradlist::Vector{Num}, raw_outputs::Vector{Symbol}, cons
             #### Start of alternative to experimental section
 
             # Send the element at `new_ID` to create_kernel!()
-            create_kernel!(expr_hash, kernel_count, extract(factored, new_ID), get_name.(gradlist), func_outputs, constants, factored, sparsity)
+            create_kernel!(expr_hash, kernel_count, extract(factored, new_ID), get_name.(gradlist), func_outputs, constants, factored)
             push!(kernel_nums, kernel_count)
             push!(inputs, string.(get_name.(pull_vars(extract(factored, new_ID)))))
             push!(outputs, string(factored[new_ID].lhs))
@@ -188,7 +185,7 @@ function kgen(num::Num, gradlist::Vector{Num}, raw_outputs::Vector{Symbol}, cons
             # If the total number of lines (not including the final line) is below the max size 
             # and the number of variables is below 32, we can make the final kernel and be done
             if (n_vars[end] < 32) && (all(n_lines[1:end-1] .<= max_size))
-                create_kernel!(expr_hash, kernel_count, extract(factored), get_name.(gradlist), func_outputs, constants, factored, sparsity)
+                create_kernel!(expr_hash, kernel_count, extract(factored), get_name.(gradlist), func_outputs, constants, factored)
                 push!(kernel_nums, kernel_count)
                 push!(inputs, string.(get_name.(pull_vars(extract(factored)))))
                 push!(outputs, "OUT")
@@ -435,8 +432,8 @@ end
 # This function takes information about the file name, kernel ID, and
 # the expression that a SINGLE kernel is being created for, and creates
 # that kernel in the specified file.
-create_kernel!(expr_hash::String, kernel_ID::Int, num::Num, gradlist::Vector{Symbol}, func_outputs::Vector{Symbol}, constants::Vector{Num}, orig_factored::Vector{Equation}, orig_sparsity::Vector{Vector{Int}}) = create_kernel!(expr_hash, kernel_ID, num.val, gradlist, func_outputs, constants, orig_factored, orig_sparsity)
-function create_kernel!(expr_hash::String, kernel_ID::Int, num::BasicSymbolic{Real}, gradlist::Vector{Symbol}, func_outputs::Vector{Symbol}, constants::Vector{Num}, orig_factored::Vector{Equation}, orig_sparsity::Vector{Vector{Int}})
+create_kernel!(expr_hash::String, kernel_ID::Int, num::Num, gradlist::Vector{Symbol}, func_outputs::Vector{Symbol}, constants::Vector{Num}, orig_factored::Vector{Equation}) = create_kernel!(expr_hash, kernel_ID, num.val, gradlist, func_outputs, constants, orig_factored)
+function create_kernel!(expr_hash::String, kernel_ID::Int, num::BasicSymbolic{Real}, gradlist::Vector{Symbol}, func_outputs::Vector{Symbol}, constants::Vector{Num}, orig_factored::Vector{Equation})
     # This function will create a kernel for `num`, with the name:
     # "f_" * expr_hash * "_$n". This name will be pushed to `kernels`,
     # and a vector of the required inputs variables will be pushed to
@@ -466,41 +463,7 @@ function create_kernel!(expr_hash::String, kernel_ID::Int, num::BasicSymbolic{Re
     # normally, unless it's a temporary variable, in which case we have to refer to the original
     # factorization and sparsity.
     string_gradlist = string.(gradlist)
-    sparsity = Vector{Vector{Int}}(undef, length(varorder))
-    for i in eachindex(varorder)
-        if varorder[i] in string_gradlist
-            # Mark sparsity if the variable is already in gradlist
-            sparsity[i] = [findfirst(==(varorder[i]), string_gradlist)]
-        else
-            # Find out what index we're on
-            idx = findfirst(x -> isequal(string(x.lhs), varorder[i]), factorized)
-
-            if isnothing(idx)
-                sparsity[i] = orig_sparsity[findfirst(x -> isequal(string(x.lhs), varorder[i]), orig_factored)]
-            else
-                # Extract all the variables for this index
-                vars = pull_vars(extract(factorized, idx))
-
-                # For each variable in the expanded expression, add in sparsity information
-                curr_sparsity = Int[]
-                for var in vars
-                    ID = findfirst(==(string(get_name(var))), string_gradlist)
-                    if isnothing(ID)
-                        # If we didn't find the variable, we need to scan the original factorization,
-                        # and then pull sparsity info from the original sparsity list
-                        ID = findfirst(x -> isequal(string(x.lhs), string(var)), orig_factored)
-                        push!(curr_sparsity, orig_sparsity[ID]...)
-                    else
-                        # If we do find the variable, we can add this variable directly into the sparsity
-                        push!(curr_sparsity, ID)
-                    end
-                end
-
-                # Add a sorted, unique list to the sparsity tracker
-                sparsity[i] = sort(unique(curr_sparsity))
-            end
-        end
-    end
+    sparsity = get_sparsity(varorder, string_gradlist, factorized)
 
     # Check if we need temporary variables at all. We don't need
     # temporary variables if we only have addition, or if we have
@@ -536,7 +499,7 @@ function create_kernel!(expr_hash::String, kernel_ID::Int, num::BasicSymbolic{Re
     maxtemp = 0
     # if need_temps #(Skip for now)
         for i in eachindex(varorder) # Loop through every participating variable
-            if (varorder[i] in string.(get_name.(vars)))
+            if (varorder[i] in string.(vars))
                 # Skip the variable if it's an input
                 continue
             end
@@ -608,7 +571,7 @@ function create_kernel!(expr_hash::String, kernel_ID::Int, num::BasicSymbolic{Re
     file = open(joinpath(@__DIR__, "storage", "f_"*expr_hash*".jl"), "a")
 
     # Put in the preamble.
-    write(file, preamble_string(expr_hash, ["OUT"; string.(get_name.(vars))], kernel_ID, maxtemp, length(gradlist)))
+    write(file, preamble_string(expr_hash, ["OUT"; string.(vars)], kernel_ID, maxtemp, length(gradlist)))
 
     # Loop through the topological list to add calculations in order
     temp_endlist = []
@@ -616,7 +579,7 @@ function create_kernel!(expr_hash::String, kernel_ID::Int, num::BasicSymbolic{Re
     name_tracker = copy(varids)
     for i in eachindex(varorder) # Order in which variables are calculated
         # Skip calculation if the variable is one of the inputs
-        if (varorder[i] in string.(get_name.(vars)))
+        if (varorder[i] in string.(vars))
             continue
         end
 
@@ -628,20 +591,17 @@ function create_kernel!(expr_hash::String, kernel_ID::Int, num::BasicSymbolic{Re
         factorized_ID = findfirst(x -> isequal(string(x.lhs), varorder[i]), factorized)
         participants = get_name.(pull_vars(factorized[factorized_ID].rhs))
         inputs = []
+        input_IDs = Int[]
         for p in string.(participants)
             # Find the corresponding element in varids
             varids_ID = findfirst(x -> isequal(x, p), varids)
-            # Push the name_tracker name to the input list
+            # Push the name_tracker name to the input list and the ID to the list of input IDs
             push!(inputs, name_tracker[varids_ID])
-        end
 
-        # [Deprecating; I'll use temporary variables the whole way and then set
-        # the output variable at the end for final copying]
-        # # If this is the final variable, it'll be called "OUT". No need
-        # # for temp variables
-        # if i==length(varorder)
-        #     name_tracker[ID] = "OUT"
-        # else
+            # Find the corresponding element in varorder
+            varorder_ID = findfirst(x -> isequal(x, p), varorder)
+            push!(input_IDs, varorder_ID)
+        end
 
         # Determine which tempID to use/override. temp_endlist keeps
         # track of where variables will be used in the future (stored
@@ -695,6 +655,7 @@ function create_kernel!(expr_hash::String, kernel_ID::Int, num::BasicSymbolic{Re
         # Now we can append this temporary variable to the list of inputs
         # for the correct operation
         inputs = [name_tracker[ID]; inputs]
+        input_IDs = [i; input_IDs]
 
         # Now we can pass the equation's RHS and the inputs to call the correct
         # writer function
@@ -702,14 +663,12 @@ function create_kernel!(expr_hash::String, kernel_ID::Int, num::BasicSymbolic{Re
             # Special case. We're adding inputs[3] to inputs[2], so we only want
             # to pass the sparsity information of inputs[3] (rather than the
             # sparsity information of inputs[2] and inputs[3])
-            corrected_i = findfirst(x->x==inputs[3], varorder)
-            write_operation(file, factorized[factorized_ID].rhs, inputs, string.(gradlist), sparsity[corrected_i])
+            write_operation(file, factorized[factorized_ID].rhs, inputs, string.(gradlist), sparsity[input_IDs[3]])
         elseif length(inputs)>2 && inputs[1]==inputs[3]
             # Special case. We're adding inputs[2] to inputs[3], so we only want
             # to pass the sparsity information of inputs[2] (rather than the
             # sparsity information of inputs[2] and inputs[3])
-            corrected_i = findfirst(x->x==inputs[2], varorder)
-            write_operation(file, factorized[factorized_ID].rhs, inputs, string.(gradlist), sparsity[corrected_i])
+            write_operation(file, factorized[factorized_ID].rhs, inputs, string.(gradlist), sparsity[input_IDs[2]])
         else
             write_operation(file, factorized[factorized_ID].rhs, inputs, string.(gradlist), sparsity[i])
         end
@@ -765,10 +724,6 @@ end
 # 1) (a^x1)^b = (a^b)^x1 [EAGO paper] (Can't do powers besides integers)
 function perform_substitutions(old_factored::Vector{Equation})
     factored = deepcopy(old_factored)
-
-    # Register any terms we want to substitute
-    @eval @register_symbolic SCMC_sigmoid(x)
-
     scan_flag = true
     while scan_flag
         scan_flag = false
@@ -1468,23 +1423,28 @@ function pull_mult(factors, index; args=[])
 end
 
 
-# A helper function to calculate the sparsity of a factorization, given
-# the full gradlist
-function detect_sparsity(factored, gradlist)
-    # Idea is to check every element of "factored" and pull out a list of indices
-    # in gradlist that the variables depend on.
-    sparsity = Vector{Int}[]
-    string_gradlist = string.(gradlist)
-
-    for i in eachindex(factored)
-        vars = string.(pull_vars(extract(factored, i)))
-        indices = zeros(Int, length(vars))
-        for j in eachindex(indices)
-            indices[j] = findfirst(==(string(vars[j])), string_gradlist)
+# A helper function to calculate the sparsity of a factorization
+function get_sparsity(varorder, string_gradlist, factored)
+    sparsity = [Int[] for _ in 1:length(varorder)]
+    function calc_sp(v)
+        if !isempty(sparsity[v])
+            return sparsity[v]
         end
-        push!(sparsity, indices)
+        if varorder[v] in string_gradlist
+            sparsity[v] = [findfirst(==(varorder[v]), string_gradlist)]
+            return sparsity[v]
+        end
+        idx = findfirst(x -> isequal(string(x.lhs), varorder[v]), factored)
+        RHS_vars = pull_vars(factored[idx].rhs)
+        for var in RHS_vars
+            var_idx = findfirst(==(string(get_name(var))), varorder)
+            sparsity[v] = [sparsity[v]..., calc_sp(var_idx)...]
+        end
+        return sort(unique(sparsity[v]))
     end
-
+    for v in 1:length(varorder)
+        sparsity[v] = calc_sp(v)
+    end
     return sparsity
 end
 
