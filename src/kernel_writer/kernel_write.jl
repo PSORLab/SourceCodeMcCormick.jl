@@ -380,7 +380,6 @@ end
 # This function takes information about the file name, kernel ID, and
 # the expression that a SINGLE kernel is being created for, and creates
 # that kernel in the specified file.
-create_kernel!(expr_hash::String, kernel_ID::Int, factored::Vector{Equation}, stop_point::Int, gradlist::Vector{Symbol}, constants::Vector{Num}, all_vars::Vector{Symbol}, sparsity::Vector{Vector{Int}}) = create_kernel!(expr_hash, kernel_ID, factored, stop_point, gradlist, constants, all_vars, sparsity)
 function create_kernel!(expr_hash::String, kernel_ID::Int, factored::Vector{Equation}, stop_point::Int, gradlist::Vector{Symbol}, constants::Vector{Num}, all_vars::Vector{Symbol}, sparsity::Vector{Vector{Int}})
     # This function will create a kernel for the portion of `factored`
     # ending at `stop_point`, with the name:
