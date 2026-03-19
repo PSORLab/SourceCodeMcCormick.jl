@@ -118,6 +118,30 @@ function eqn_edges(a::Vector{Equation})
     end
     return edgelist, vars
 end
+function eqn_edges(a::Vector{Equation}, vars::Vector{Symbol})
+    # Create the list of edges
+    edgelist = Edge{Int}[]
+
+    # Create a mapping dictionary
+    varid = Dict(vars .=> collect(1:length(vars)))
+
+    # Identify LHS variables
+    LHS_id = [varid[x] for x in Symbol.(getfield.(a, :lhs))]
+
+    # Identify RHS variables
+    RHS_id = [[varid[x] for x in pull_vars(RHS, get_names=true)] for RHS in getfield.(a, :rhs)]
+
+    # Create edges of RHS -> LHS
+    for i in eachindex(LHS_id)
+        for j in eachindex(RHS_id[i])
+            if RHS_id[i][j] == LHS_id[i]
+                continue
+            end
+            push!(edgelist, Edge(RHS_id[i][j], LHS_id[i]))
+        end
+    end
+    return edgelist
+end
 
 # A new topological sort that tries to minimize the number of temporary vectors
 # that need to be preallocated
@@ -128,7 +152,7 @@ function topological_sort(g::SimpleDiGraph; order::Vector{Int64}=Int64[])
         for j in g.badjlist[i][sortperm(-lengths)]
             recursive_add(g, j, order)
         end
-        if ~in(i, order)
+        if ~in(i, order) && ~isempty(g.badjlist[i])
             push!(order, i)
         end
     end
