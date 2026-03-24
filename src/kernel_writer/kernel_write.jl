@@ -4,20 +4,24 @@ include(joinpath(@__DIR__, "math_kernels.jl"))
 include(joinpath(@__DIR__, "string_math_kernels.jl"))
 
 # The kernel-generating function, analogous to fgen.
-kgen(num::Num; constants::Vector{Num}=Num[], overwrite::Bool=false, splitting::Symbol=:default, affine_quadratic::Bool=true) = kgen(num, setdiff(pull_vars(num), constants), [:all], constants, overwrite, splitting, affine_quadratic)
-kgen(num::Num, gradlist::Vector{Num}; constants::Vector{Num}=Num[], overwrite::Bool=false, splitting::Symbol=:default, affine_quadratic::Bool=true) = kgen(num, gradlist, [:all], constants, overwrite, splitting, affine_quadratic)
-kgen(num::Num, raw_outputs::Vector{Symbol}; constants::Vector{Num}=Num[], overwrite::Bool=false, splitting::Symbol=:default, affine_quadratic::Bool=true) = kgen(num, setdiff(pull_vars(num), constants), raw_outputs, constants, overwrite, splitting, affine_quadratic)
-kgen(num::Num, gradlist::Vector{Num}, raw_outputs::Vector{Symbol}; constants::Vector{Num}=Num[], overwrite::Bool=false, splitting::Symbol=:default, affine_quadratic::Bool=true) = kgen(num, gradlist, raw_outputs, constants, overwrite, splitting, affine_quadratic)
-function kgen(num::Num, gradlist::Vector{Num}, raw_outputs::Vector{Symbol}, constants::Vector{Num}, overwrite::Bool, splitting::Symbol, affine_quadratic::Bool)
+kgen(num::Num; constants::Vector{Num}=Num[], overwrite::Bool=false, splitting::Symbol=:default, affine_quadratic::Bool=true, compile::Bool=true) = kgen(num, setdiff(pull_vars(num), constants), [:all], constants, overwrite, splitting, affine_quadratic, compile)
+kgen(num::Num, gradlist::Vector{Num}; constants::Vector{Num}=Num[], overwrite::Bool=false, splitting::Symbol=:default, affine_quadratic::Bool=true, compile::Bool=true) = kgen(num, gradlist, [:all], constants, overwrite, splitting, affine_quadratic, compile)
+kgen(num::Num, raw_outputs::Vector{Symbol}; constants::Vector{Num}=Num[], overwrite::Bool=false, splitting::Symbol=:default, affine_quadratic::Bool=true, compile::Bool=true) = kgen(num, setdiff(pull_vars(num), constants), raw_outputs, constants, overwrite, splitting, affine_quadratic, compile)
+kgen(num::Num, gradlist::Vector{Num}, raw_outputs::Vector{Symbol}; constants::Vector{Num}=Num[], overwrite::Bool=false, splitting::Symbol=:default, affine_quadratic::Bool=true, compile::Bool=true) = kgen(num, gradlist, raw_outputs, constants, overwrite, splitting, affine_quadratic, compile)
+function kgen(num::Num, gradlist::Vector{Num}, raw_outputs::Vector{Symbol}, constants::Vector{Num}, overwrite::Bool, splitting::Symbol, affine_quadratic::Bool, compile::Bool)
     # Create a hash of the expression and check if the function already exists
     expr_hash = string(hash(string(num)*string(gradlist)), base=62)
     if (overwrite==false) && (isfile(joinpath(@__DIR__, "storage", "f_"*expr_hash*".jl")))
         try func_name = eval(Meta.parse("f_"*expr_hash))
             return func_name
         catch
-            include(joinpath(@__DIR__, "storage", "f_"*expr_hash*".jl"))
-            func_name = eval(Meta.parse("f_"*expr_hash))
-            @eval $(func_name)(CUDA.zeros(Float64, 2, 4+2*length($gradlist)), [CUDA.zeros(Float64, 2,3) for i = 1:length($gradlist)]...)
+            if compile
+                include(joinpath(@__DIR__, "storage", "f_"*expr_hash*".jl"))
+                func_name = eval(Meta.parse("f_"*expr_hash))
+                @eval $(func_name)(CUDA.zeros(Float64, 2, 4+2*length($gradlist)), [CUDA.zeros(Float64, 2,3) for i = 1:length($gradlist)]...)
+            else
+                func_name = Meta.parse("f_"*expr_hash)
+            end
             return func_name
         end
     end
@@ -44,7 +48,7 @@ function kgen(num::Num, gradlist::Vector{Num}, raw_outputs::Vector{Symbol}, cons
     # and Software, 33:3, 563-593 (2018). DOI: 10.1080/10556788.2017.1335312
     # This method is also used in EAGO's `affine_relax_quadratic!` function.
     if affine_quadratic==true && is_quadratic(num) # NOTE: When switching to MOI variables, this will be easy to detect
-        func_name = kgen_affine_quadratic(expr_hash, num, gradlist, constants)
+        func_name = kgen_affine_quadratic(expr_hash, num, gradlist, constants, compile)
         return func_name
     end
 
@@ -142,9 +146,6 @@ function kgen(num::Num, gradlist::Vector{Num}, raw_outputs::Vector{Symbol}, cons
         end
     end
 
-    # Include all the kernels that were just generated
-    include(joinpath(@__DIR__, "storage", "f_"*expr_hash*".jl"))
-
     # We can assume that the newly created kernels have sufficiently
     # high register usage that they all have a max number of 256 threads.
     # All that we need is to figure out the maximum number of blocks
@@ -160,10 +161,15 @@ function kgen(num::Num, gradlist::Vector{Num}, raw_outputs::Vector{Symbol}, cons
     close(file)
 
     # Compile the function and kernels
-    include(joinpath(@__DIR__, "storage", "f_"*expr_hash*".jl"))
-    func_name = eval(Meta.parse("f_"*expr_hash))
-    @eval $(func_name)(CUDA.zeros(Float64, 2, 4+2*length($gradlist)), [CUDA.zeros(Float64, 2, 3) for i = 1:length($gradlist)]...)
-    return func_name
+    if compile
+        include(joinpath(@__DIR__, "storage", "f_"*expr_hash*".jl"))
+        func_name = eval(Meta.parse("f_"*expr_hash))
+        @eval $(func_name)(CUDA.zeros(Float64, 2, 4+2*length($gradlist)), [CUDA.zeros(Float64, 2, 3) for i = 1:length($gradlist)]...)
+        return func_name
+    else
+        func_name = Meta.parse("f_"*expr_hash)
+        return func_name
+    end
 end
 
 # This is a quick function to detect if a Num object is quadratic. This function
@@ -257,7 +263,7 @@ end
 # A special version of kgen that only applies to quadratic functions. Instead of
 # doing McCormick relaxations, this returns either affine bounds or secant line
 # bounds, depending on where on the quadratic function the point of interest is.
-function kgen_affine_quadratic(expr_hash::String, num::Num, gradlist::Vector{Num}, constants::Vector{Num})
+function kgen_affine_quadratic(expr_hash::String, num::Num, gradlist::Vector{Num}, constants::Vector{Num}, compile::Bool)
     # Since it's quadratic, we can construct the kernel according to
     # `affine_relax_quadratic!` in EAGO.
 
@@ -350,9 +356,6 @@ function kgen_affine_quadratic(expr_hash::String, num::Num, gradlist::Vector{Num
     end
     close(file)
 
-    # Include this kernel so SCMC knows what it is
-    include(joinpath(@__DIR__, "storage", "f_"*expr_hash*".jl"))
-
     # Add onto the file the "main" CPU function that calls the kernel
     blocks = Int32(CUDA.attribute(CUDA.device(), CUDA.DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT))
     file = open(joinpath(@__DIR__, "storage", "f_"*expr_hash*".jl"), "a")
@@ -366,10 +369,15 @@ function kgen_affine_quadratic(expr_hash::String, num::Num, gradlist::Vector{Num
     close(file)
 
     # Include the file again to get the final kernel
-    include(joinpath(@__DIR__, "storage", "f_"*expr_hash*".jl"))
-    func_name = eval(Meta.parse("f_"*expr_hash))
-    @eval $(func_name)(CUDA.zeros(Float64, 2, 4+2*length($gradlist)), [CUDA.zeros(Float64, 2,4) for i = 1:length($gradlist)]...)
-    return func_name
+    if compile
+        include(joinpath(@__DIR__, "storage", "f_"*expr_hash*".jl"))
+        func_name = eval(Meta.parse("f_"*expr_hash))
+        @eval $(func_name)(CUDA.zeros(Float64, 2, 4+2*length($gradlist)), [CUDA.zeros(Float64, 2,4) for i = 1:length($gradlist)]...)
+        return func_name
+    else
+        func_name = Meta.parse("f_"*expr_hash)
+        return func_name
+    end
 end
 
 
