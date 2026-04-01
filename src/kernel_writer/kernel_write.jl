@@ -584,7 +584,7 @@ function create_kernel!(expr_hash::String, kernel_ID::Int, factored::Vector{Equa
             # sparsity information of inputs[2] and inputs[3])
             write_operation(file, factored[factored_ID].rhs, inputs, string.(gradlist), sparsity[input_IDs[2]])
         else
-            write_operation(file, factored[factored_ID].rhs, inputs, string.(gradlist), sparsity[i])
+            write_operation(file, factored[factored_ID].rhs, inputs, string.(gradlist), sparsity[ID])
         end
 
         # Now that we're done with this variable, eliminate this variable
