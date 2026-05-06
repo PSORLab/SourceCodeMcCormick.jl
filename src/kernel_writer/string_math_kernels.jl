@@ -10572,7 +10572,7 @@ function SCMC_cos_kernel(OUT::String, v1::String, varlist::Vector{String}, spars
         write(buffer, "                if $v1_hi - $v1_lo > 3.141592653589793\n")
         write(buffer, "                    $OUT_lo = -1.0\n")
         write(buffer, "                    $OUT_hi = 1.0\n")
-        write(buffer, "                elseif lo_quadrant==2 && hi_quadrant==3\n")
+        write(buffer, "                elseif lo_quadrant==2 || lo_quadrant==3\n")
         write(buffer, "                    $OUT_lo = cos(lo)\n")
         write(buffer, "                    $OUT_hi = cos(hi)\n")
         write(buffer, "                else\n")
