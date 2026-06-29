@@ -10,7 +10,6 @@ using Graphs
 using CUDA
 using StaticArrays: @MVector
 using MultiFloats
-using PrecompileTools: @setup_workload, @compile_workload
 import Dates
 import SymbolicUtils: BasicSymbolic, exprtype, SYM, TERM, ADD, MUL, POW, DIV
 
@@ -51,26 +50,6 @@ include(joinpath(@__DIR__, "transform", "transform.jl"))
 include(joinpath(@__DIR__, "grad", "grad.jl"))
 include(joinpath(@__DIR__, "kernel_writer", "kernel_write.jl"))
 
-@setup_workload begin
-    @variables x, y
-    @compile_workload begin
-        kgen(1 + x + y^2 + x*y, overwrite=true, compile=false)
-        kgen(1 + 
-            (-x) + 
-            exp(x) + 
-            log(x) + 
-            (1/x) + 
-            abs(x) + 
-            2*y + 
-            (1/(1+exp(-x))) + 
-            x^3 + 
-            x^4 + 
-            x^3.5 + 
-            cos(x) + 
-            x*y, overwrite=true, compile=false)
-        kgen(x^3)
-    end
-end
 
 export McCormickIntervalTransform, IntervalTransform
 
