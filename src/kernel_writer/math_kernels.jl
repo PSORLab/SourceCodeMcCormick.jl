@@ -1365,6 +1365,7 @@ end
 
 # Sigmoid function
 # max threads: 640
+@register_symbolic SCMC_sigmoid(x) # Register as symbolic so that we can use it later
 function SCMC_sigmoid_kernel(OUT::CuDeviceMatrix, x::CuDeviceMatrix)
     idx = threadIdx().x + (blockIdx().x - Int32(1)) * blockDim().x
     stride = blockDim().x * gridDim().x
@@ -4670,21 +4671,21 @@ function SCMC_cos_kernel(OUT::CuDeviceMatrix, x::CuDeviceMatrix)
         kL = Base.ceil(-0.5 - x[idx,3]/(2.0*pi))
         xL1 = x[idx,3] + 2.0*pi*kL
         xU1 = x[idx,4] + 2.0*pi*kL
-        if (xL1 < -pi) || (xL1 > pi)
+        if (xL1 < -pi) || (xL1 > Float64(pi))
             eps_min = NaN
             eps_max = NaN
         elseif xL1 <= 0.0
             if xU1 <= 0.0
                 eps_min = x[idx,3]
                 eps_max = x[idx,4]
-            elseif xU1 >= pi
+            elseif xU1 >= Float64(pi)
                 eps_min = pi - 2.0*pi*kL
                 eps_max = -2.0*pi*kL
             else
                 eps_min = (cos(xL1) <= cos(xU1)) ? x[idx,3] : x[idx,4]
                 eps_max = -2.0*pi*kL
             end
-        elseif xU1 <= pi
+        elseif xU1 <= Float64(pi)
             eps_min = x[idx,4]
             eps_max = x[idx,3]
         elseif xU1 >= 2.0*pi
@@ -5449,9 +5450,16 @@ function cos_newton_or_golden_section(x0::Float64, xL::Float64, xU::Float64, env
     return xk
 end
 
-# Directly from IntervalArithmetic.jl
+# Similar to IntervalArithmetic.jl, but not using `rem2pi`
 function quadrant(x::Float64)
-    x_mod2pi = rem2pi(x, RoundNearest)
+    bigx = MultiFloats.Float64x2(x)
+    bigpi = MultiFloats._MF{Float64,2}((3.141592653589793, 1.2246467991473532e-16))
+    rem = Float64(floor(bigx/bigpi))
+    if iseven(rem)
+        x_mod2pi = Float64(bigx - rem*bigpi)
+    else
+        x_mod2pi = Float64(bigx - (rem+1)*bigpi)
+    end
     
     x_mod2pi < -(pi/2.0) && return (Int32(2), x_mod2pi)
     x_mod2pi < 0 && return (Int32(3), x_mod2pi)

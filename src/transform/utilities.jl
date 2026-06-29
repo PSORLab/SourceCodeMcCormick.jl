@@ -236,18 +236,22 @@ julia> pull_vars(func)
  z
 ```
 """
-pull_vars(term::BasicSymbolic) = pull_vars(Num(term))
-function pull_vars(term::Num)
+pull_vars(term::BasicSymbolic; get_names::Bool=false) = pull_vars(Num(term), get_names=get_names)
+function pull_vars(term::Num; get_names::Bool=false)
     vars = Num[]
     strings = String[]
     if ~(typeof(term.val) <: Real)
         vars, strings = _pull_vars(term.val, vars, strings)
         vars = vars[sort_vars(strings)]
     end
-    return vars
+    if get_names
+        return get_name.(vars)
+    else
+        return vars
+    end
 end
 
-function pull_vars(terms::Vector{Num})
+function pull_vars(terms::Vector{Num}; get_names::Bool=false)
     vars = Num[]
     strings = String[]
     for term in terms
@@ -258,20 +262,28 @@ function pull_vars(terms::Vector{Num})
     if ~isempty(vars)
         vars = vars[sort_vars(strings)]
     end
-    return vars
+    if get_names
+        return get_name.(vars)
+    else
+        return vars
+    end
 end
 
-function pull_vars(eqn::Equation)
+function pull_vars(eqn::Equation; get_names::Bool=false)
     vars = Num[]
     strings = String[]
     if ~(typeof(eqn.rhs) <: Real)
         vars, strings = _pull_vars(eqn.rhs, vars, strings)
         vars = vars[sort_vars(strings)]
     end
-    return vars
+    if get_names
+        return get_name.(vars)
+    else
+        return vars
+    end
 end
 
-function pull_vars(eqns::Vector{Equation})
+function pull_vars(eqns::Vector{Equation}; get_names::Bool=false)
     vars = Num[]
     strings = String[]
     for eqn in eqns
@@ -282,9 +294,13 @@ function pull_vars(eqns::Vector{Equation})
     if ~isempty(vars)
         vars = vars[sort_vars(strings)]
     end
-    return vars
+    if get_names
+        return get_name.(vars)
+    else
+        return vars
+    end
 end
-function pull_vars(eqn::T) where T<:Real
+function pull_vars(eqn::T; get_names::Bool=false) where T<:Real
     return Num[]
 end
 
@@ -534,6 +550,35 @@ function extract(eqs::Vector{Equation}, ID::Int=length(eqs))
         end
     end
     return final_expr
+end
+
+
+"""
+    shorten(::Vector{Equation}, ::Int)
+
+Given a set of symbolic equations, and a specific element index,
+return a Vector{Equation} that only contains elements needed to
+evaluate the chosen element.
+```
+"""
+function shorten(eqs::Vector{Equation}, ID::Int)
+    indices = Int[]
+    function delve!(idx, indices, LHS, RHS)
+        if idx in indices
+            return nothing
+        else
+            for var in RHS[idx]
+                var_idx = findfirst(==(var), LHS)
+                if ~isnothing(var_idx) && (var_idx != idx)
+                    delve!(var_idx, indices, LHS, RHS)
+                end
+            end
+            push!(indices, idx)
+            return nothing
+        end
+    end
+    delve!(ID, indices, Symbol.(getfield.(eqs, :lhs)), pull_vars.(getfield.(eqs, :rhs), get_names=true))
+    return eqs[indices]
 end
 
 """
